@@ -15,12 +15,13 @@ const Add = ({token}) => {
  const [description, setDescription] = useState('');
  const [price, setPrice] = useState('');
   const [Mrpprice, setMrpprice] = useState('');
- const [category, setCategory] = useState('Men');
- const [subCategory, setSubCategory] = useState('Topwear');
+ const [category, setCategory] = useState('Apparels');
+ const [subCategory, setSubCategory] = useState('Men');
  const [collegeMerchandise, setCollegeMerchandise] = useState('');
  const [merchandiseList, setMerchandiseList] = useState([]);
  const [newMerchandise, setNewMerchandise] = useState('');
  const [showAddMerchandise, setShowAddMerchandise] = useState(false);
+ const [quantity, setQuantity] = useState(0);
 
 
  const [bestseller, setBestseller] = useState(false);
@@ -28,9 +29,7 @@ const Add = ({token}) => {
 
  // Define subcategories for each category
  const subCategoryOptions = {
-   'Men': ['Topwear', 'Bottomwear', 'Winterwear'],
-   'Women': ['Topwear', 'Bottomwear', 'Winterwear'],
-   'Kids': ['Topwear', 'Bottomwear', 'Winterwear'],
+   'Apparels': ['Men', 'Women', 'Kids'],
    'Accessories': [
      'Bags & Backpacks',
      'Tote Bags / Sling Bags',
@@ -105,8 +104,8 @@ const Add = ({token}) => {
    // Set first subcategory of the new category
    const newSubCategories = subCategoryOptions[newCategory] || [];
    setSubCategory(newSubCategories[0] || '');
-   // Clear sizes if non-clothing category
-   if (newCategory === 'Accessories' || newCategory === 'Stationery & Academic Supplies' || newCategory === 'Lifestyle & Utility Items' || newCategory === 'Tech & Gadgets' || newCategory === 'Event & Souvenir Merchandise' || newCategory === 'Eco-Friendly & Sustainable Merchandise' || newCategory === 'Gift Sets & Combos' || newCategory === 'Sports & Fitness Merchandise' || newCategory === 'Home & Dorm Essentials') {
+   // Clear sizes if non-apparel category
+   if (newCategory !== 'Apparels') {
      setSizes([]);
    }
  };
@@ -176,6 +175,7 @@ const Add = ({token}) => {
       formData.append('bestseller', bestseller);
       formData.append('sizes', JSON.stringify(sizes));
       formData.append('collegeMerchandise', collegeMerchandise);
+      formData.append('quantity', quantity);
 
          
       console.log([...formData]);
@@ -188,7 +188,10 @@ const Add = ({token}) => {
         setName('');
         setDescription('');
         setPrice('');     
-                        
+        setMrpprice('');
+        setQuantity(0);
+        setSizes([]);
+        setBestseller(false);
         setImage1('');  
         setImage2('');                 
         setImage3('');
@@ -248,9 +251,7 @@ const Add = ({token}) => {
 
             <p className='mb-2'>Product category</p>
             <select onChange={(e)=>handleCategoryChange(e.target.value)} value={category} className="w-full px-3 py-2" name="category" id="">
-              <option value="Men">Men</option>
-              <option value="Women">Women</option>
-              <option value="Kids">Kids</option>
+              <option value="Apparels">Apparels</option>
               <option value="Accessories">Accessories</option>
               <option value="Stationery & Academic Supplies">Stationery & Academic Supplies</option>
               <option value="Lifestyle & Utility Items">Lifestyle & Utility Items</option>
@@ -271,7 +272,10 @@ const Add = ({token}) => {
               ))}
             </select>
            </div>
-           <div>
+         </div>
+
+         <div className='flex flex-col sm:flex-row gap-2 w-full sm:gap-8'>
+           <div className='flex-1'>
 
             <p className='mb-2'>College Merchandise</p>
             <div className='flex gap-2 items-end'>
@@ -333,23 +337,28 @@ const Add = ({token}) => {
               </div>
             )}
            </div>
+         </div>
 
-
+         <div className='flex flex-col sm:flex-row gap-2 w-full sm:gap-8'>
            <div>
              <p className='mb-2 '>Product price</p>
-             <input onChange={(e)=>setPrice(e.target.value)} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='25' />
-              
+             <input onChange={(e)=>setPrice(e.target.value)} value={price} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='25' />
            </div>
 
- <div>
-           <p className='mb-2 '>MRP price</p>
-              <input onChange={(e)=>setMrpprice(e.target.value)} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='25' />
-              </div>
+           <div>
+             <p className='mb-2 '>MRP price</p>
+             <input onChange={(e)=>setMrpprice(e.target.value)} value={Mrpprice} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='25' />
+           </div>
+
+           <div>
+             <p className='mb-2 '>Quantity</p>
+             <input onChange={(e)=>setQuantity(e.target.value)} value={quantity} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='0' min='0' />
+           </div>
          </div>
 
 
 
- {category !== 'Accessories' && category !== 'Stationery & Academic Supplies' && category !== 'Lifestyle & Utility Items' && category !== 'Tech & Gadgets' && category !== 'Event & Souvenir Merchandise' && category !== 'Eco-Friendly & Sustainable Merchandise' && category !== 'Gift Sets & Combos' && category !== 'Sports & Fitness Merchandise' && category !== 'Home & Dorm Essentials' && (
+ {category === 'Apparels' && (
  <div>
   <p className='mb-2'>Product Sizes</p>
   <div className='flex gap-3'>
