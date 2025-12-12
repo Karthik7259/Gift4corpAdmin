@@ -6,6 +6,10 @@ import { toast } from 'react-toastify';
 const List = ({token}) => {
 
  const [list, setList] = useState([]);
+ const [filteredList, setFilteredList] = useState([]);
+ const [stockFilter, setStockFilter] = useState('all');
+ const [priceSort, setPriceSort] = useState('default');
+ const [lowStockThreshold, setLowStockThreshold] = useState(10);
  const [showEditDialog, setShowEditDialog] = useState(false);
  const [editProduct, setEditProduct] = useState(null);
  const [formData, setFormData] = useState({
@@ -19,7 +23,8 @@ const List = ({token}) => {
    collegeMerchandise: '',
    sizes: [],
    quantity: 0,
-   color: ''
+   color: '',
+   brand: ''
  });
  const [images, setImages] = useState([null, null, null, null]);
 
@@ -30,6 +35,7 @@ const List = ({token}) => {
     console.log(response.data);
     if(response.data.success){
       setList(response.data.products);
+      setFilteredList(response.data.products);
 
     }else{
       toast.error(response.data.message);
@@ -71,7 +77,8 @@ const openEditDialog = (product) => {
     collegeMerchandise: product.collegeMerchandise || '',
     sizes: product.sizes || [],
     quantity: product.quantity || 0,
-    color: product.color || ''
+    color: product.color || '',
+    brand: product.brand || ''
   });
   setImages([null, null, null, null]);
   setShowEditDialog(true);
@@ -91,7 +98,8 @@ const closeEditDialog = () => {
     collegeMerchandise: '',
     sizes: [],
     quantity: 0,
-    color: ''
+    color: '',
+    brand: ''
   });
   setImages([null, null, null, null]);
 }
@@ -138,6 +146,7 @@ const handleUpdateProduct = async (e) => {
     formDataToSend.append('collegeMerchandise', formData.collegeMerchandise);
     formDataToSend.append('quantity', formData.quantity);
     formDataToSend.append('color', formData.color);
+    formDataToSend.append('brand', formData.brand);
     
     if (formData.sizes.length > 0) {
       formDataToSend.append('sizes', JSON.stringify(formData.sizes));
@@ -175,35 +184,116 @@ const handleUpdateProduct = async (e) => {
   fetchList();
  }, []);
 
+ useEffect(() => {
+  applyFilters();
+ }, [list, stockFilter, priceSort, lowStockThreshold]);
+
+ const applyFilters = () => {
+  let filtered = [...list];
+
+  // Apply stock filter
+  if (stockFilter === 'low') {
+    filtered = filtered.filter(item => item.quantity <= lowStockThreshold);
+  } else if (stockFilter === 'out') {
+    filtered = filtered.filter(item => item.quantity === 0);
+  }
+
+  // Apply price sort
+  if (priceSort === 'low-high') {
+    filtered.sort((a, b) => a.price - b.price);
+  } else if (priceSort === 'high-low') {
+    filtered.sort((a, b) => b.price - a.price);
+  }
+
+  setFilteredList(filtered);
+ };
+
 
 
   return (
     <>
 
     <p className='mb-2 '>All Products List</p>
+    
+    {/* Filter Controls */}
+    <div className='flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 border rounded'>
+      <div className='flex flex-col gap-1'>
+        <label className='text-sm font-medium'>Stock Filter</label>
+        <select 
+          value={stockFilter} 
+          onChange={(e) => setStockFilter(e.target.value)}
+          className='px-3 py-2 border rounded'
+        >
+          <option value='all'>All Products</option>
+          <option value='low'>Low Stock</option>
+          <option value='out'>Out of Stock</option>
+        </select>
+      </div>
+
+      {stockFilter === 'low' && (
+        <div className='flex flex-col gap-1'>
+          <label className='text-sm font-medium'>Low Stock Threshold</label>
+          <input
+            type='number'
+            value={lowStockThreshold}
+            onChange={(e) => setLowStockThreshold(Number(e.target.value))}
+            min='1'
+            className='px-3 py-2 border rounded w-24'
+          />
+        </div>
+      )}
+
+      <div className='flex flex-col gap-1'>
+        <label className='text-sm font-medium'>Sort by Price</label>
+        <select 
+          value={priceSort} 
+          onChange={(e) => setPriceSort(e.target.value)}
+          className='px-3 py-2 border rounded'
+        >
+          <option value='default'>Default</option>
+          <option value='low-high'>Price: Low to High</option>
+          <option value='high-low'>Price: High to Low</option>
+        </select>
+      </div>
+
+      <div className='flex flex-col gap-1 justify-end'>
+        <p className='text-sm font-medium text-gray-700'>
+          Showing {filteredList.length} of {list.length} products
+        </p>
+      </div>
+    </div>
+
         <div className='flex flex-col gap-2'>
 
 
  {/*  list table title */}
 
  
-  <div className='hidden md:grid grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr] items-center py-1 px-2 border bg-gray-100 text-sm '>
+  <div className='hidden md:grid grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center py-1 px-2 border bg-gray-100 text-sm '>
     <b>Image</b>
     <b>Name</b>
     <b>Category</b>
     <b>Price</b>
+    <b className='text-center'>Stock</b>
     <b className='text-center'>Edit</b>
     <b className='text-center'>Delete</b>
   </div>
 
    {/*  ------------products list ----------- */}
    {
-    list.map((item,index)=>(
-               <div className='grid grid-cols-[1fr_3fr_1fr] md:grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr] items-center gap-2 py-1 px-2 border text-sm ' key={index}>
+    filteredList.map((item,index)=>(
+               <div className='grid grid-cols-[1fr_3fr_1fr] md:grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 py-1 px-2 border text-sm ' key={index}>
                  <img className='w-12' src={item.image[0]} alt="" />
                  <p>{item.name}</p>
                  <p>{item.category}</p>
                  <p>{currency}{item.price}</p>
+                 <p className={`text-center font-medium ${
+                   item.quantity === 0 ? 'text-red-600' : 
+                   item.quantity <= 10 ? 'text-orange-600' : 
+                   'text-green-600'
+                 }`}>
+                   {item.quantity}
+                 </p>
                  <button
                    onClick={() => openEditDialog(item)}
                    className='text-blue-600 hover:text-blue-800 text-center cursor-pointer'
@@ -346,6 +436,18 @@ const handleUpdateProduct = async (e) => {
                       value={formData.color}
                       onChange={handleInputChange}
                       placeholder='e.g., Red, Blue'
+                      className='w-full px-3 py-2 border rounded'
+                    />
+                  </div>
+
+                  <div>
+                    <label className='block mb-2 font-medium'>Brand</label>
+                    <input
+                      type='text'
+                      name='brand'
+                      value={formData.brand}
+                      onChange={handleInputChange}
+                      placeholder='e.g., Nike, Adidas'
                       className='w-full px-3 py-2 border rounded'
                     />
                   </div>

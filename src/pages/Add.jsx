@@ -23,6 +23,7 @@ const Add = ({token}) => {
  const [showAddMerchandise, setShowAddMerchandise] = useState(false);
  const [quantity, setQuantity] = useState(0);
  const [color, setColor] = useState('');
+ const [brand, setBrand] = useState('');
  const [weight, setWeight] = useState(400);
  const [length, setLength] = useState(30);
  const [breadth, setBreadth] = useState(27);
@@ -170,6 +171,7 @@ const Add = ({token}) => {
       formData.append('collegeMerchandise', collegeMerchandise);
       formData.append('quantity', quantity);
       formData.append('color', color);
+      formData.append('brand', brand);
       formData.append('weight', weight);
       formData.append('length', length);
       formData.append('breadth', breadth);
@@ -189,6 +191,7 @@ const Add = ({token}) => {
         setMrpprice('');
         setQuantity(0);
         setColor('');
+        setBrand('');
         setWeight(400);
         setLength(30);
         setBreadth(27);
@@ -359,6 +362,11 @@ const Add = ({token}) => {
            <div>
              <p className='mb-2 '>Color</p>
              <input onChange={(e)=>setColor(e.target.value)} value={color} className='w-full px-3 py-2 sm:w-[120px]' type="text" placeholder='Red' />
+           </div>
+
+           <div>
+             <p className='mb-2 '>Brand</p>
+             <input onChange={(e)=>setBrand(e.target.value)} value={brand} className='w-full px-3 py-2 sm:w-[120px]' type="text" placeholder='Nike' />
            </div>
          </div>
 
