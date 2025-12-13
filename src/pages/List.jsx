@@ -10,6 +10,10 @@ const List = ({token}) => {
  const [stockFilter, setStockFilter] = useState('all');
  const [priceSort, setPriceSort] = useState('default');
  const [lowStockThreshold, setLowStockThreshold] = useState(10);
+ const [categoryFilter, setCategoryFilter] = useState('all');
+ const [subCategoryFilter, setSubCategoryFilter] = useState('all');
+ const [availableCategories, setAvailableCategories] = useState([]);
+ const [availableSubCategories, setAvailableSubCategories] = useState([]);
  const [showEditDialog, setShowEditDialog] = useState(false);
  const [editProduct, setEditProduct] = useState(null);
  const [formData, setFormData] = useState({
@@ -24,7 +28,9 @@ const List = ({token}) => {
    sizes: [],
    quantity: 0,
    color: '',
-   brand: ''
+   brand: '',
+   useSizeVariants: false,
+   sizeVariants: []
  });
  const [images, setImages] = useState([null, null, null, null]);
 
@@ -34,8 +40,17 @@ const List = ({token}) => {
     const response=await axios.get(backendURL+ '/api/product/list')
     console.log(response.data);
     if(response.data.success){
-      setList(response.data.products);
-      setFilteredList(response.data.products);
+      const products = response.data.products;
+      setList(products);
+      setFilteredList(products);
+      
+      // Extract unique categories
+      const categories = [...new Set(products.map(p => p.category))].sort();
+      setAvailableCategories(categories);
+      
+      // Extract unique subcategories
+      const subCategories = [...new Set(products.map(p => p.subCategory).filter(Boolean))].sort();
+      setAvailableSubCategories(subCategories);
 
     }else{
       toast.error(response.data.message);
@@ -66,6 +81,7 @@ const removeProduct=async(id)=>{
 
 const openEditDialog = (product) => {
   setEditProduct(product);
+  const hasSizeVariants = product.sizeVariants && product.sizeVariants.length > 0;
   setFormData({
     name: product.name,
     description: product.description,
@@ -78,7 +94,9 @@ const openEditDialog = (product) => {
     sizes: product.sizes || [],
     quantity: product.quantity || 0,
     color: product.color || '',
-    brand: product.brand || ''
+    brand: product.brand || '',
+    useSizeVariants: hasSizeVariants,
+    sizeVariants: hasSizeVariants ? product.sizeVariants : []
   });
   setImages([null, null, null, null]);
   setShowEditDialog(true);
@@ -99,7 +117,9 @@ const closeEditDialog = () => {
     sizes: [],
     quantity: 0,
     color: '',
-    brand: ''
+    brand: '',
+    useSizeVariants: false,
+    sizeVariants: []
   });
   setImages([null, null, null, null]);
 }
@@ -117,7 +137,19 @@ const handleSizeToggle = (size) => {
     const sizes = prev.sizes.includes(size)
       ? prev.sizes.filter(s => s !== size)
       : [...prev.sizes, size];
-    return { ...prev, sizes };
+    
+    let sizeVariants = prev.sizeVariants;
+    if (prev.useSizeVariants) {
+      if (!prev.sizes.includes(size)) {
+        // Adding new size
+        sizeVariants = [...sizeVariants, { size, price: prev.price || '', mrpPrice: prev.Mrpprice || '', quantity: 0 }];
+      } else {
+        // Removing size
+        sizeVariants = sizeVariants.filter(v => v.size !== size);
+      }
+    }
+    
+    return { ...prev, sizes, sizeVariants };
   });
 }
 
@@ -147,6 +179,8 @@ const handleUpdateProduct = async (e) => {
     formDataToSend.append('quantity', formData.quantity);
     formDataToSend.append('color', formData.color);
     formDataToSend.append('brand', formData.brand);
+    formDataToSend.append('useSizeVariants', formData.useSizeVariants);
+    formDataToSend.append('sizeVariants', JSON.stringify(formData.sizeVariants));
     
     if (formData.sizes.length > 0) {
       formDataToSend.append('sizes', JSON.stringify(formData.sizes));
@@ -186,10 +220,20 @@ const handleUpdateProduct = async (e) => {
 
  useEffect(() => {
   applyFilters();
- }, [list, stockFilter, priceSort, lowStockThreshold]);
+ }, [list, stockFilter, priceSort, lowStockThreshold, categoryFilter, subCategoryFilter]);
 
  const applyFilters = () => {
   let filtered = [...list];
+
+  // Apply category filter
+  if (categoryFilter !== 'all') {
+    filtered = filtered.filter(item => item.category === categoryFilter);
+  }
+
+  // Apply subcategory filter
+  if (subCategoryFilter !== 'all') {
+    filtered = filtered.filter(item => item.subCategory === subCategoryFilter);
+  }
 
   // Apply stock filter
   if (stockFilter === 'low') {
@@ -217,6 +261,37 @@ const handleUpdateProduct = async (e) => {
     
     {/* Filter Controls */}
     <div className='flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 border rounded'>
+      <div className='flex flex-col gap-1'>
+        <label className='text-sm font-medium'>Category</label>
+        <select 
+          value={categoryFilter} 
+          onChange={(e) => {
+            setCategoryFilter(e.target.value);
+            setSubCategoryFilter('all'); // Reset subcategory when category changes
+          }}
+          className='px-3 py-2 border rounded'
+        >
+          <option value='all'>All Categories</option>
+          {availableCategories.map((cat, index) => (
+            <option key={index} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className='flex flex-col gap-1'>
+        <label className='text-sm font-medium'>Subcategory</label>
+        <select 
+          value={subCategoryFilter} 
+          onChange={(e) => setSubCategoryFilter(e.target.value)}
+          className='px-3 py-2 border rounded'
+        >
+          <option value='all'>All Subcategories</option>
+          {availableSubCategories.map((subCat, index) => (
+            <option key={index} value={subCat}>{subCat}</option>
+          ))}
+        </select>
+      </div>
+
       <div className='flex flex-col gap-1'>
         <label className='text-sm font-medium'>Stock Filter</label>
         <select 
@@ -281,18 +356,34 @@ const handleUpdateProduct = async (e) => {
 
    {/*  ------------products list ----------- */}
    {
-    filteredList.map((item,index)=>(
+    filteredList.map((item,index)=>{
+      // Calculate total stock for display (sum of all size variants or overall stock)
+      let displayStock = item.quantity || 0;
+      let stockTooltip = '';
+      
+      if(item.sizeVariants && item.sizeVariants.length > 0){
+        displayStock = item.sizeVariants.reduce((sum, variant) => sum + (variant.quantity || 0), 0);
+        stockTooltip = item.sizeVariants.map(v => `${v.size}: ${v.quantity}`).join(', ');
+      }
+      
+      return (
                <div className='grid grid-cols-[1fr_3fr_1fr] md:grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 py-1 px-2 border text-sm ' key={index}>
                  <img className='w-12' src={item.image[0]} alt="" />
                  <p>{item.name}</p>
                  <p>{item.category}</p>
                  <p>{currency}{item.price}</p>
-                 <p className={`text-center font-medium ${
-                   item.quantity === 0 ? 'text-red-600' : 
-                   item.quantity <= 10 ? 'text-orange-600' : 
-                   'text-green-600'
-                 }`}>
-                   {item.quantity}
+                 <p 
+                   className={`text-center font-medium ${
+                     displayStock === 0 ? 'text-red-600' : 
+                     displayStock <= 10 ? 'text-orange-600' : 
+                     'text-green-600'
+                   }`}
+                   title={stockTooltip || `Total stock: ${displayStock}`}
+                 >
+                   {displayStock}
+                   {item.sizeVariants && item.sizeVariants.length > 0 && (
+                     <span className='text-xs block text-gray-500'>({item.sizeVariants.length} sizes)</span>
+                   )}
                  </p>
                  <button
                    onClick={() => openEditDialog(item)}
@@ -304,7 +395,8 @@ const handleUpdateProduct = async (e) => {
                  onClick={()=>removeProduct(item._id)}
                  className='text-right md:text-center cursor-pointer text-lg text-red-600 hover:text-red-800'>X</p>
                </div>
-    )
+      )
+    }
   )
    }
         </div>
@@ -468,6 +560,40 @@ const handleUpdateProduct = async (e) => {
 
                 {/* Sizes - Only show for Apparels category */}
                 {formData.category === 'Apparels' && (
+                  <>
+                  <div className='mb-4'>
+                    <div className='flex items-center gap-3 mb-3'>
+                      <input 
+                        type="checkbox" 
+                        checked={formData.useSizeVariants}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => {
+                            if (checked && prev.sizes.length > 0) {
+                              // Initialize size variants with selected sizes
+                              const variants = prev.sizes.map(size => {
+                                const existing = prev.sizeVariants.find(v => v.size === size);
+                                return existing || {
+                                  size,
+                                  price: prev.price || '',
+                                  mrpPrice: prev.Mrpprice || '',
+                                  quantity: 0
+                                };
+                              });
+                              return { ...prev, useSizeVariants: checked, sizeVariants: variants };
+                            } else {
+                              return { ...prev, useSizeVariants: checked, sizeVariants: [] };
+                            }
+                          });
+                        }}
+                        className='cursor-pointer'
+                      />
+                      <label className='cursor-pointer font-medium'>
+                        Enable different pricing for each size
+                      </label>
+                    </div>
+                  </div>
+
                   <div>
                     <label className='block mb-2 font-medium'>Sizes</label>
                     <div className='flex gap-2 flex-wrap'>
@@ -487,6 +613,63 @@ const handleUpdateProduct = async (e) => {
                       ))}
                     </div>
                   </div>
+
+                  {formData.useSizeVariants && formData.sizeVariants.length > 0 && (
+                    <div className='mt-4 p-4 bg-gray-50 border rounded'>
+                      <p className='mb-3 font-medium'>Set Price & Quantity for Each Size</p>
+                      <div className='space-y-3'>
+                        {formData.sizeVariants.map((variant, index) => (
+                          <div key={variant.size} className='flex gap-3 items-center bg-white p-3 rounded border'>
+                            <div className='w-12 font-bold text-center'>{variant.size}</div>
+                            <div className='flex-1'>
+                              <label className='text-xs text-gray-600'>Price</label>
+                              <input 
+                                type="number"
+                                value={variant.price}
+                                onChange={(e) => {
+                                  const updated = [...formData.sizeVariants];
+                                  updated[index].price = e.target.value;
+                                  setFormData(prev => ({ ...prev, sizeVariants: updated }));
+                                }}
+                                className='w-full px-2 py-1 border rounded'
+                                placeholder='Price'
+                              />
+                            </div>
+                            <div className='flex-1'>
+                              <label className='text-xs text-gray-600'>MRP Price</label>
+                              <input 
+                                type="number"
+                                value={variant.mrpPrice}
+                                onChange={(e) => {
+                                  const updated = [...formData.sizeVariants];
+                                  updated[index].mrpPrice = e.target.value;
+                                  setFormData(prev => ({ ...prev, sizeVariants: updated }));
+                                }}
+                                className='w-full px-2 py-1 border rounded'
+                                placeholder='MRP'
+                              />
+                            </div>
+                            <div className='flex-1'>
+                              <label className='text-xs text-gray-600'>Quantity</label>
+                              <input 
+                                type="number"
+                                value={variant.quantity}
+                                onChange={(e) => {
+                                  const updated = [...formData.sizeVariants];
+                                  updated[index].quantity = e.target.value;
+                                  setFormData(prev => ({ ...prev, sizeVariants: updated }));
+                                }}
+                                className='w-full px-2 py-1 border rounded'
+                                placeholder='Stock'
+                                min='0'
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  </>
                 )}
 
                 {/* Bestseller */}

@@ -8,6 +8,8 @@ import List from './pages/List'
 import Orders from './pages/Orders'
 import OrderDetails from './pages/OrderDetails'
 import Login from './components/Login'
+import ManageCategories from './pages/ManageCategories'
+import ManageMerchandise from './pages/ManageMerchandise'
 import { ToastContainer, toast } from 'react-toastify';
 
 export const backendURL = import.meta.env.VITE_BACKEND_URL
@@ -39,6 +41,8 @@ useEffect(() => {
                 <Route path='/list' element={ <List token={token} /> } />
                 <Route path='/orders' element={ <Orders token={token} /> } />
                 <Route path='/orders/:orderId' element={ <OrderDetails token={token} /> } />
+                <Route path='/categories' element={ <ManageCategories token={token} /> } />
+                <Route path='/merchandise' element={ <ManageMerchandise token={token} /> } />
             </Routes>
          </div>
       </div>

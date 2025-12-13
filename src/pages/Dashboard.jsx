@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Dashboard = ({ token }) => {
   const navigate = useNavigate();
-  const [filterType, setFilterType] = useState('today'); // today, thisMonth, lastMonth, custom
+  const [filterType, setFilterType] = useState('all'); // today, thisMonth, lastMonth, custom, all
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState({
@@ -224,11 +224,11 @@ const Dashboard = ({ token }) => {
             }}
             className='border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
           >
+            <option value='all'>All Time</option>
             <option value='today'>Today</option>
             <option value='thisMonth'>This Month</option>
             <option value='lastMonth'>Last Month</option>
             <option value='custom'>Custom Month</option>
-            <option value='all'>All Time</option>
           </select>
           
           {filterType === 'custom' && (

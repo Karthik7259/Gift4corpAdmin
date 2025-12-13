@@ -32,10 +32,27 @@ const Add = ({token}) => {
 
  const [bestseller, setBestseller] = useState(false);
  const [sizes,setSizes]=useState([]);
+ const [useSizeVariants, setUseSizeVariants] = useState(false);
+ const [sizeVariants, setSizeVariants] = useState([]);
+ // sizeVariants: [{ size: 'S', price: 500, mrpPrice: 700, quantity: 10 }]
+
+ // State for dynamic categories
+ const [categories, setCategories] = useState([]);
+ const [showAddCategory, setShowAddCategory] = useState(false);
+ const [newCategory, setNewCategory] = useState('');
+ const [showAddSubcategory, setShowAddSubcategory] = useState(false);
+ const [newSubcategory, setNewSubcategory] = useState('');
 
  // Define subcategories for each category
  const subCategoryOptions = {
-   'Apparels': ['Men', 'Women', 'Kids'],
+   'Apparels': [
+     'T-shirts (crew neck, polo, oversized, dri-fit)',
+     'Hoodies & Sweatshirts',
+     'Jackets & Windcheaters',
+     'Caps',
+     'Formal Wear (shirts)',
+     'Sports Jerseys',
+   ],
    'Accessories': [
      'Bags & Backpacks',
      'Tote Bags / Sling Bags',
@@ -95,19 +112,93 @@ const Add = ({token}) => {
  // Handle category change
  const handleCategoryChange = (newCategory) => {
    setCategory(newCategory);
-   // Set first subcategory of the new category
-   const newSubCategories = subCategoryOptions[newCategory] || [];
-   setSubCategory(newSubCategories[0] || '');
+   // Get subcategories from dynamic data or fallback to hardcoded
+   const categoryData = categories.find(cat => cat.name === newCategory);
+   const dynamicSubcategories = categoryData?.subcategories || [];
+   const hardcodedSubcategories = subCategoryOptions[newCategory] || [];
+   
+   // Combine both and remove duplicates
+   const allSubcategories = [...new Set([...dynamicSubcategories, ...hardcodedSubcategories])];
+   
+   setSubCategory(allSubcategories[0] || '');
    // Clear sizes if non-apparel category
    if (newCategory !== 'Apparels') {
      setSizes([]);
    }
  };
 
+ const handleAddCategory = async () => {
+   if (!newCategory.trim()) {
+     toast.error('Please enter a category name');
+     return;
+   }
+
+   try {
+     const response = await axios.post(
+       backendURL + '/api/category/add',
+       { name: newCategory, subcategories: [] },
+       { headers: { token } }
+     );
+
+     if (response.data.success) {
+       toast.success(response.data.message);
+       setNewCategory('');
+       setShowAddCategory(false);
+       fetchCategories();
+     } else {
+       toast.error(response.data.message);
+     }
+   } catch (err) {
+     console.log(err);
+     toast.error(err.response?.data?.message || 'Failed to add category');
+   }
+ };
+
+ const handleAddSubcategory = async () => {
+   if (!newSubcategory.trim()) {
+     toast.error('Please enter a subcategory name');
+     return;
+   }
+
+   try {
+     const response = await axios.post(
+       backendURL + '/api/category/add-subcategory',
+       { categoryName: category, subcategory: newSubcategory },
+       { headers: { token } }
+     );
+
+     if (response.data.success) {
+       toast.success(response.data.message);
+       setNewSubcategory('');
+       setShowAddSubcategory(false);
+       fetchCategories();
+       setSubCategory(newSubcategory);
+     } else {
+       toast.error(response.data.message);
+     }
+   } catch (err) {
+     console.log(err);
+     toast.error(err.response?.data?.message || 'Failed to add subcategory');
+   }
+ };
+
  // Fetch merchandise list on component mount
  useEffect(() => {
    fetchMerchandiseList();
+   fetchCategories();
  }, []);
+
+ const fetchCategories = async () => {
+   try {
+     const response = await axios.get(backendURL + '/api/category/list');
+     if (response.data.success) {
+       setCategories(response.data.categories);
+     }
+   } catch (err) {
+     console.log(err);
+     toast.error('Failed to fetch categories');
+   }
+ };
 
  const fetchMerchandiseList = async () => {
    try {
@@ -168,6 +259,8 @@ const Add = ({token}) => {
       formData.append('subCategory', subCategory);
       formData.append('bestseller', bestseller);
       formData.append('sizes', JSON.stringify(sizes));
+      formData.append('useSizeVariants', useSizeVariants);
+      formData.append('sizeVariants', JSON.stringify(sizeVariants));
       formData.append('collegeMerchandise', collegeMerchandise);
       formData.append('quantity', quantity);
       formData.append('color', color);
@@ -197,6 +290,8 @@ const Add = ({token}) => {
         setBreadth(27);
         setHeight(2);
         setSizes([]);
+        setSizeVariants([]);
+        setUseSizeVariants(false);
         setBestseller(false);
         setImage1('');  
         setImage2('');                 
@@ -253,28 +348,142 @@ const Add = ({token}) => {
 
 
          <div className='flex flex-col sm:flex-row gap-2 w-full sm:gap-8 '>
-           <div>
+           <div className='flex-1'>
 
             <p className='mb-2'>Product category</p>
-            <select onChange={(e)=>handleCategoryChange(e.target.value)} value={category} className="w-full px-3 py-2" name="category" id="">
-              <option value="Apparels">Apparels</option>
-              <option value="Accessories">Accessories</option>
-              <option value="Stationery & Academic Supplies">Stationery & Academic Supplies</option>
-              <option value="Tech & Gadgets">Tech & Gadgets</option>
-              <option value="Event & Souvenir Merchandise">Event & Souvenir Merchandise</option>
-              <option value="Eco-Friendly & Sustainable Merchandise">Eco-Friendly & Sustainable Merchandise</option>
-              <option value="Gift Sets & Combos">Gift Sets & Combos</option>
-              <option value="Sports & Fitness Merchandise">Sports & Fitness Merchandise</option>
-            </select>
+            <div className='flex gap-2 items-end'>
+              <div className='flex-1'>
+                <select 
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') {
+                      setShowAddCategory(true);
+                    } else {
+                      handleCategoryChange(e.target.value);
+                    }
+                  }} 
+                  value={category} 
+                  className="w-full px-3 py-2"
+                >
+                  {/* Hardcoded categories */}
+                  <option value="Apparels">Apparels</option>
+                  <option value="Accessories">Accessories</option>
+                  <option value="Stationery & Academic Supplies">Stationery & Academic Supplies</option>
+                  <option value="Tech & Gadgets">Tech & Gadgets</option>
+                  <option value="Event & Souvenir Merchandise">Event & Souvenir Merchandise</option>
+                  <option value="Eco-Friendly & Sustainable Merchandise">Eco-Friendly & Sustainable Merchandise</option>
+                  <option value="Gift Sets & Combos">Gift Sets & Combos</option>
+                  <option value="Sports & Fitness Merchandise">Sports & Fitness Merchandise</option>
+                  
+                  {/* Dynamic categories from database */}
+                  {categories
+                    .filter(cat => !['Apparels', 'Accessories', 'Stationery & Academic Supplies', 'Tech & Gadgets', 'Event & Souvenir Merchandise', 'Eco-Friendly & Sustainable Merchandise', 'Gift Sets & Combos', 'Sports & Fitness Merchandise'].includes(cat.name))
+                    .map((cat) => (
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
+                    ))
+                  }
+                  
+                  <option value="__add_new__" style={{color: '#4CAF50', fontWeight: 'bold'}}>
+                    + Add New Category
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            {showAddCategory && (
+              <div className='mt-2 p-3 bg-gray-100 rounded'>
+                <input 
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder='Enter new category name'
+                  className='w-full px-3 py-2 mb-2'
+                />
+                <div className='flex gap-2'>
+                  <button 
+                    type='button'
+                    onClick={handleAddCategory}
+                    className='bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600'
+                  >
+                    Add
+                  </button>
+                  <button 
+                    type='button'
+                    onClick={() => {
+                      setShowAddCategory(false);
+                      setNewCategory('');
+                    }}
+                    className='bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600'
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
            </div>
-           <div>
+           
+           <div className='flex-1'>
 
             <p className='mb-2'>Sub category</p>
-            <select onChange={(e)=>setSubCategory(e.target.value)} value={subCategory} className="w-full px-3 py-2" name="subCategory" id="">
-              {(subCategoryOptions[category] || []).map((sub) => (
-                <option key={sub} value={sub}>{sub}</option>
-              ))}
-            </select>
+            <div className='flex gap-2 items-end'>
+              <div className='flex-1'>
+                <select 
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') {
+                      setShowAddSubcategory(true);
+                    } else {
+                      setSubCategory(e.target.value);
+                    }
+                  }} 
+                  value={subCategory} 
+                  className="w-full px-3 py-2"
+                >
+                  {(() => {
+                    const categoryData = categories.find(cat => cat.name === category);
+                    const dynamicSubcategories = categoryData?.subcategories || [];
+                    const hardcodedSubcategories = subCategoryOptions[category] || [];
+                    const allSubcategories = [...new Set([...hardcodedSubcategories, ...dynamicSubcategories])];
+                    
+                    return allSubcategories.map((sub) => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ));
+                  })()}
+                  <option value="__add_new__" style={{color: '#4CAF50', fontWeight: 'bold'}}>
+                    + Add New Subcategory
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            {showAddSubcategory && (
+              <div className='mt-2 p-3 bg-gray-100 rounded'>
+                <input 
+                  type="text"
+                  value={newSubcategory}
+                  onChange={(e) => setNewSubcategory(e.target.value)}
+                  placeholder='Enter new subcategory name'
+                  className='w-full px-3 py-2 mb-2'
+                />
+                <div className='flex gap-2'>
+                  <button 
+                    type='button'
+                    onClick={handleAddSubcategory}
+                    className='bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600'
+                  >
+                    Add
+                  </button>
+                  <button 
+                    type='button'
+                    onClick={() => {
+                      setShowAddSubcategory(false);
+                      setNewSubcategory('');
+                    }}
+                    className='bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600'
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
            </div>
          </div>
 
@@ -395,26 +604,163 @@ const Add = ({token}) => {
 
 
  {category === 'Apparels' && (
+ <>
+ <div className='mb-4'>
+  <div className='flex items-center gap-3 mb-3'>
+    <input 
+      type="checkbox" 
+      id='useSizeVariants' 
+      checked={useSizeVariants}
+      onChange={(e) => {
+        setUseSizeVariants(e.target.checked);
+        if (e.target.checked && sizes.length > 0) {
+          // Initialize size variants with selected sizes
+          const variants = sizes.map(size => ({
+            size,
+            price: price || '',
+            mrpPrice: Mrpprice || '',
+            quantity: 0
+          }));
+          setSizeVariants(variants);
+        } else {
+          setSizeVariants([]);
+        }
+      }}
+      className='cursor-pointer'
+    />
+    <label htmlFor='useSizeVariants' className='cursor-pointer font-medium'>
+      Enable different pricing for each size
+    </label>
+  </div>
+</div>
+
  <div>
   <p className='mb-2'>Product Sizes</p>
   <div className='flex gap-3'>
-    <div onClick={()=>setSizes(prev => prev.includes("S") ? (prev.filter(item=>item !== "S")): [...prev,"S"])}>
+    <div onClick={()=>{
+      const newSizes = sizes.includes("S") ? sizes.filter(item=>item !== "S") : [...sizes,"S"];
+      setSizes(newSizes);
+      if (useSizeVariants) {
+        if (!sizes.includes("S")) {
+          setSizeVariants([...sizeVariants, { size: "S", price: price || '', mrpPrice: Mrpprice || '', quantity: 0 }]);
+        } else {
+          setSizeVariants(sizeVariants.filter(v => v.size !== "S"));
+        }
+      }
+    }}>
       <p className={`${sizes.includes("S") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>S</p>
     </div>
-    <div onClick={()=>setSizes(prev => prev.includes("M") ? (prev.filter(item=>item !== "M")): [...prev,"M"])}>
+    <div onClick={()=>{
+      const newSizes = sizes.includes("M") ? sizes.filter(item=>item !== "M") : [...sizes,"M"];
+      setSizes(newSizes);
+      if (useSizeVariants) {
+        if (!sizes.includes("M")) {
+          setSizeVariants([...sizeVariants, { size: "M", price: price || '', mrpPrice: Mrpprice || '', quantity: 0 }]);
+        } else {
+          setSizeVariants(sizeVariants.filter(v => v.size !== "M"));
+        }
+      }
+    }}>
       <p className={`${sizes.includes("M") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>M</p>
     </div>
-    <div onClick={()=>setSizes(prev => prev.includes("L") ? (prev.filter(item=>item !== "L")): [...prev,"L"])}>
+    <div onClick={()=>{
+      const newSizes = sizes.includes("L") ? sizes.filter(item=>item !== "L") : [...sizes,"L"];
+      setSizes(newSizes);
+      if (useSizeVariants) {
+        if (!sizes.includes("L")) {
+          setSizeVariants([...sizeVariants, { size: "L", price: price || '', mrpPrice: Mrpprice || '', quantity: 0 }]);
+        } else {
+          setSizeVariants(sizeVariants.filter(v => v.size !== "L"));
+        }
+      }
+    }}>
       <p className={`${sizes.includes("L") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>L</p>
     </div>
-    <div onClick={()=>setSizes(prev => prev.includes("XL") ? (prev.filter(item=>item !== "XL")): [...prev,"XL"])}>
+    <div onClick={()=>{
+      const newSizes = sizes.includes("XL") ? sizes.filter(item=>item !== "XL") : [...sizes,"XL"];
+      setSizes(newSizes);
+      if (useSizeVariants) {
+        if (!sizes.includes("XL")) {
+          setSizeVariants([...sizeVariants, { size: "XL", price: price || '', mrpPrice: Mrpprice || '', quantity: 0 }]);
+        } else {
+          setSizeVariants(sizeVariants.filter(v => v.size !== "XL"));
+        }
+      }
+    }}>
       <p className={`${sizes.includes("XL") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>XL</p>
     </div>
-    <div onClick={()=>setSizes(prev => prev.includes("XXL") ? (prev.filter(item=>item !== "XXL")): [...prev,"XXL"])}>
+    <div onClick={()=>{
+      const newSizes = sizes.includes("XXL") ? sizes.filter(item=>item !== "XXL") : [...sizes,"XXL"];
+      setSizes(newSizes);
+      if (useSizeVariants) {
+        if (!sizes.includes("XXL")) {
+          setSizeVariants([...sizeVariants, { size: "XXL", price: price || '', mrpPrice: Mrpprice || '', quantity: 0 }]);
+        } else {
+          setSizeVariants(sizeVariants.filter(v => v.size !== "XXL"));
+        }
+      }
+    }}>
       <p className={`${sizes.includes("XXL") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>XXL</p>
     </div>
   </div>
  </div>
+
+ {useSizeVariants && sizeVariants.length > 0 && (
+  <div className='mt-4 p-4 bg-gray-50 border rounded'>
+    <p className='mb-3 font-medium'>Set Price & Quantity for Each Size</p>
+    <div className='space-y-3'>
+      {sizeVariants.map((variant, index) => (
+        <div key={variant.size} className='flex gap-3 items-center bg-white p-3 rounded border'>
+          <div className='w-12 font-bold text-center'>{variant.size}</div>
+          <div className='flex-1'>
+            <label className='text-xs text-gray-600'>Price</label>
+            <input 
+              type="number"
+              value={variant.price}
+              onChange={(e) => {
+                const updated = [...sizeVariants];
+                updated[index].price = e.target.value;
+                setSizeVariants(updated);
+              }}
+              className='w-full px-2 py-1 border rounded'
+              placeholder='Price'
+            />
+          </div>
+          <div className='flex-1'>
+            <label className='text-xs text-gray-600'>MRP Price</label>
+            <input 
+              type="number"
+              value={variant.mrpPrice}
+              onChange={(e) => {
+                const updated = [...sizeVariants];
+                updated[index].mrpPrice = e.target.value;
+                setSizeVariants(updated);
+              }}
+              className='w-full px-2 py-1 border rounded'
+              placeholder='MRP'
+            />
+          </div>
+          <div className='flex-1'>
+            <label className='text-xs text-gray-600'>Quantity</label>
+            <input 
+              type="number"
+              value={variant.quantity}
+              onChange={(e) => {
+                const updated = [...sizeVariants];
+                updated[index].quantity = e.target.value;
+                setSizeVariants(updated);
+              }}
+              className='w-full px-2 py-1 border rounded'
+              placeholder='Stock'
+              min='0'
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+ )}
+ </>
  )}
 
 
