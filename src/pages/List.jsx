@@ -187,7 +187,10 @@ const handleUpdateProduct = async (e) => {
     formDataToSend.append('subCategory', formData.subCategory);
     formDataToSend.append('bestseller', formData.bestseller);
     formDataToSend.append('collegeMerchandise', formData.collegeMerchandise);
-    formDataToSend.append('quantity', formData.quantity);
+    // Only send general quantity if not using size variants
+    if (!formData.useSizeVariants) {
+      formDataToSend.append('quantity', formData.quantity);
+    }
     formDataToSend.append('color', formData.color);
     formDataToSend.append('brand', formData.brand);
     formDataToSend.append('useSizeVariants', formData.useSizeVariants);
@@ -520,19 +523,21 @@ const handleUpdateProduct = async (e) => {
 
                 {/* Quantity */}
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                  <div>
-                    <label className='block mb-2 font-medium'>Quantity</label>
-                    <input
-                      type='number'
-                      name='quantity'
-                      value={formData.quantity}
-                      onChange={handleInputChange}
-                      min='0'
-                      className='w-full px-3 py-2 border rounded'
-                      required
-                    />
-                  </div>
-
+                  {/* Only show general quantity if not using size variants */}
+                  {!formData.useSizeVariants && (
+                    <div>
+                      <label className='block mb-2 font-medium'>Quantity</label>
+                      <input
+                        type='number'
+                        name='quantity'
+                        value={formData.quantity}
+                        onChange={handleInputChange}
+                        min='0'
+                        className='w-full px-3 py-2 border rounded'
+                        required
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className='block mb-2 font-medium'>Color</label>
                     <input
@@ -610,7 +615,7 @@ const handleUpdateProduct = async (e) => {
                   <div>
                     <label className='block mb-2 font-medium'>Sizes</label>
                     <div className='flex gap-2 flex-wrap'>
-                      {['S', 'M', 'L', 'XL', 'XXL'].map(size => (
+                      {['S', 'M', 'L', 'XL', 'XXL', 'XXXL'].map(size => (
                         <button
                           key={size}
                           type='button'

@@ -262,7 +262,10 @@ const Add = ({token}) => {
       formData.append('useSizeVariants', useSizeVariants);
       formData.append('sizeVariants', JSON.stringify(sizeVariants));
       formData.append('collegeMerchandise', collegeMerchandise);
-      formData.append('quantity', quantity);
+      // Only send general quantity if not using size variants
+      if (!useSizeVariants) {
+        formData.append('quantity', quantity);
+      }
       formData.append('color', color);
       formData.append('brand', brand);
       formData.append('weight', weight);
@@ -563,10 +566,13 @@ const Add = ({token}) => {
              <input onChange={(e)=>setMrpprice(e.target.value)} value={Mrpprice} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='25' />
            </div>
 
-           <div>
-             <p className='mb-2 '>Quantity</p>
-             <input onChange={(e)=>setQuantity(e.target.value)} value={quantity} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='0' min='0' />
-           </div>
+           {/* Quantity field is only shown if not using size variants */}
+           {!useSizeVariants && (
+             <div>
+               <p className='mb-2 '>Quantity</p>
+               <input onChange={(e)=>setQuantity(e.target.value)} value={quantity} className='w-full px-3 py-2 sm:w-[120px]' type="Number" placeholder='0' min='0' />
+             </div>
+           )}
 
            <div>
              <p className='mb-2 '>Color</p>
@@ -701,6 +707,19 @@ const Add = ({token}) => {
       }
     }}>
       <p className={`${sizes.includes("XXL") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>XXL</p>
+    </div>
+    <div onClick={()=>{
+      const newSizes = sizes.includes("XXXL") ? sizes.filter(item=>item !== "XXXL") : [...sizes,"XXXL"];
+      setSizes(newSizes);
+      if (useSizeVariants) {
+        if (!sizes.includes("XXXL")) {
+          setSizeVariants([...sizeVariants, { size: "XXXL", price: price || '', mrpPrice: Mrpprice || '', quantity: 0 }]);
+        } else {
+          setSizeVariants(sizeVariants.filter(v => v.size !== "XXXL"));
+        }
+      }
+    }}>
+      <p className={`${sizes.includes("XXXL") ? "bg-pink-100":"bg-slate-200"} px-3 py-1 cursor-pointer `}>XXXL</p>
     </div>
   </div>
  </div>
