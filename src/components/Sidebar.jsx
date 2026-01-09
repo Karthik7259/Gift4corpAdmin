@@ -3,31 +3,40 @@ import { NavLink } from 'react-router-dom'
 import { assets } from '../assets/assets'
 
 const Sidebar = () => {
+  const links = [
+    { to: '/', label: 'Dashboard', glyph: '⌂' },
+    { to: '/add', label: 'Add Items', image: assets.add_icon },
+    { to: '/list', label: 'Products', image: assets.order_icon },
+    { to: '/orders', label: 'Orders', image: assets.parcel_icon },
+    { to: '/categories', label: 'Categories', glyph: 'C' },
+    { to: '/merchandise', label: 'Merchandise', glyph: 'M' },
+    { to: '/settings', label: 'Settings', glyph: '⚙' },
+  ]
+
   return (
-    <div className='w-[18%] min-h-screen border-r-2'>
-        <div className='flex flex-col gap-4 pt-6 pl-[20%] text-[15px]'>
-            <NavLink to='/' className='flex items-center gap-3 border border-gray-300 border-r-0 px-3 py-2 rounded-l ' >
-                 <p className='text-xl'>📊</p>
-                 <p className='hidden md:block'>Home</p>
-            </NavLink>
-            <NavLink to='/add' className='flex items-center gap-3 border border-gray-300 border-r-0 px-3 py-2 rounded-l ' >
-                 <img className='w-5 h-5' src={assets.add_icon} alt="" />
-                 <p className='hidden md:block'>Add Items</p>
-            </NavLink>
-            <NavLink to='/list' className='flex items-center gap-3 border border-gray-300 border-r-0 px-3 py-2 rounded-l ' >
-                 <img className='w-5 h-5' src={assets.order_icon} alt="" />
-                 <p className='hidden md:block'>List Items</p>
-            </NavLink>
-           
-            <NavLink to='/orders' className='flex items-center gap-3 border border-gray-300 border-r-0 px-3 py-2 rounded-l ' >
-                 <img className='w-5 h-5' src={assets.order_icon} alt="" />
-                 <p className='hidden md:block'>Orders</p>
-            </NavLink>
-            <NavLink to='/settings' className='flex items-center gap-3 border border-gray-300 border-r-0 px-3 py-2 rounded-l ' >
-                 <span className='text-xl'>⚙️</span>
-                 <p className='hidden md:block'>Settings</p>
-            </NavLink>
+    <div className='flex flex-col gap-6'>
+      <div className='nav-logo'>
+        <img src={assets.logo} alt="Gift4Corp" />
+        <div>
+          <p className='nav-title'>Gift4Corp Admin</p>
+          <p className='text-xs text-gray-300'>Liquid Glass Dashboard</p>
         </div>
+      </div>
+
+      <div className='nav-links'>
+        {links.map((link) => (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <div className='w-10 h-10 glass-elevated flex items-center justify-center text-sm font-semibold'>
+              {link.image ? <img src={link.image} alt="" className='w-5 h-5 object-contain' /> : link.glyph}
+            </div>
+            <span className='font-medium'>{link.label}</span>
+          </NavLink>
+        ))}
+      </div>
     </div>
   )
 }

@@ -11,7 +11,6 @@ const ManageCategories = ({ token }) => {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showAddSubcategory, setShowAddSubcategory] = useState(false);
 
-  // Fetch categories from backend
   const fetchCategories = async () => {
     try {
       const response = await axios.get(`${backendURL}/api/category/list`);
@@ -28,7 +27,6 @@ const ManageCategories = ({ token }) => {
     fetchCategories();
   }, []);
 
-  // Add new category
   const handleAddCategory = async () => {
     if (!newCategory.trim()) {
       toast.error('Category name cannot be empty');
@@ -56,7 +54,6 @@ const ManageCategories = ({ token }) => {
     }
   };
 
-  // Delete category
   const handleDeleteCategory = async (categoryId) => {
     if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
       return;
@@ -81,7 +78,6 @@ const ManageCategories = ({ token }) => {
     }
   };
 
-  // Add subcategory
   const handleAddSubcategory = async () => {
     if (!selectedCategoryId) {
       toast.error('Please select a category');
@@ -115,7 +111,6 @@ const ManageCategories = ({ token }) => {
     }
   };
 
-  // Delete subcategory
   const handleDeleteSubcategory = async (categoryId, subcategory) => {
     if (!confirm(`Are you sure you want to delete "${subcategory}" from this category?`)) {
       return;
@@ -141,36 +136,34 @@ const ManageCategories = ({ token }) => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Manage Categories & Subcategories</h1>
+    <div className="p-6 max-w-7xl mx-auto space-y-5">
+      <h1 className="text-3xl font-bold text-white">Manage Categories & Subcategories</h1>
 
-      {/* Add Category Section */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Categories</h2>
+      <div className="section-card glass-card space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-white">Categories</h2>
           <button
             onClick={() => setShowAddCategory(!showAddCategory)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+            className="btn btn-primary px-4 py-2"
           >
             {showAddCategory ? 'Cancel' : '+ Add Category'}
           </button>
         </div>
 
-        {/* Add Category Form */}
         {showAddCategory && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+          <div className="p-4 glass-interactive rounded-lg">
             <div className="flex gap-3">
               <input
                 type="text"
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
                 placeholder="Enter category name"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 glass-input"
                 onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
               />
               <button
                 onClick={handleAddCategory}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+                className="btn btn-primary px-6 py-2"
               >
                 Add
               </button>
@@ -178,40 +171,38 @@ const ManageCategories = ({ token }) => {
           </div>
         )}
 
-        {/* Categories List */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {categories.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No categories found. Add one to get started!</p>
+            <p className="text-gray-300 text-center py-4">No categories found. Add one to get started!</p>
           ) : (
             categories.map((category) => (
-              <div key={category._id} className="border border-gray-200 rounded-lg p-4">
+              <div key={category._id} className="glass-interactive p-4 rounded-lg">
                 <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-lg font-semibold text-gray-800">{category.name}</h3>
+                  <h3 className="text-lg font-semibold text-white">{category.name}</h3>
                   <button
                     onClick={() => handleDeleteCategory(category._id)}
-                    className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 transition text-sm"
+                    className="btn btn-ghost text-red-300 border border-red-400/40"
                   >
                     Delete Category
                   </button>
                 </div>
 
-                {/* Subcategories */}
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Subcategories:</p>
+                <div className="ml-1">
+                  <p className="text-sm font-medium text-gray-200 mb-2">Subcategories:</p>
                   {category.subcategories && category.subcategories.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {category.subcategories.map((sub, index) => (
                         <div
                           key={index}
-                          className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center gap-2"
+                          className="chip"
                         >
-                          <span className="text-sm text-gray-700">{sub}</span>
+                          <span className="text-sm text-gray-100">{sub}</span>
                           <button
                             onClick={() => handleDeleteSubcategory(category._id, sub)}
-                            className="text-red-500 hover:text-red-700 text-lg leading-none"
+                            className="text-red-300 hover:text-red-400 text-lg leading-none"
                             title="Delete subcategory"
                           >
-                            ×
+                            A-
                           </button>
                         </div>
                       ))}
@@ -226,61 +217,57 @@ const ManageCategories = ({ token }) => {
         </div>
       </div>
 
-      {/* Add Subcategory Section */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Add Subcategory</h2>
+      <div className="section-card glass-card space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-white">Add Subcategory</h2>
           <button
             onClick={() => setShowAddSubcategory(!showAddSubcategory)}
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition"
+            className="btn btn-secondary px-4 py-2"
           >
             {showAddSubcategory ? 'Cancel' : '+ Add Subcategory'}
           </button>
         </div>
 
-        {/* Add Subcategory Form */}
         {showAddSubcategory && (
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Category
-                </label>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">-- Choose a category --</option>
-                  {categories.map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subcategory Name
-                </label>
-                <input
-                  type="text"
-                  value={newSubcategory}
-                  onChange={(e) => setNewSubcategory(e.target.value)}
-                  placeholder="Enter subcategory name"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSubcategory()}
-                />
-              </div>
-
-              <button
-                onClick={handleAddSubcategory}
-                className="w-full bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+          <div className="p-4 glass-interactive rounded-lg space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-200 mb-2">
+                Select Category
+              </label>
+              <select
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                className="w-full glass-input"
               >
-                Add Subcategory
-              </button>
+                <option value="">-- Choose a category --</option>
+                {categories.map((category) => (
+                  <option key={category._id} value={category._id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-200 mb-2">
+                Subcategory Name
+              </label>
+              <input
+                type="text"
+                value={newSubcategory}
+                onChange={(e) => setNewSubcategory(e.target.value)}
+                placeholder="Enter subcategory name"
+                className="w-full glass-input"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSubcategory()}
+              />
+            </div>
+
+            <button
+              onClick={handleAddSubcategory}
+              className="btn btn-primary w-full justify-center"
+            >
+              Add Subcategory
+            </button>
           </div>
         )}
       </div>

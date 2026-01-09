@@ -422,7 +422,7 @@ const Add = ({token}) => {
   return (
     <form
     onSubmit={onSubmitHandler}
-    className='flex flex-col w-full items-start gap-3 ' >
+    className='section-card glass-card flex flex-col w-full items-start gap-4 text-white' >
          <div>
           <p className='mb-2'>Upload Image</p>
           <div className='flex gap-2'>
@@ -499,7 +499,7 @@ const Add = ({token}) => {
             </div>
 
             {showAddCategory && (
-              <div className='mt-2 p-3 bg-gray-100 rounded'>
+              <div className='mt-2 p-3 glass-interactive rounded-lg'>
                 <input 
                   type="text"
                   value={newCategory}
@@ -521,7 +521,7 @@ const Add = ({token}) => {
                       setShowAddCategory(false);
                       setNewCategory('');
                     }}
-                    className='bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600'
+                    className='btn btn-ghost border border-white/30 px-4 py-1'
                   >
                     Cancel
                   </button>
@@ -564,7 +564,7 @@ const Add = ({token}) => {
             </div>
 
             {showAddSubcategory && (
-              <div className='mt-2 p-3 bg-gray-100 rounded'>
+              <div className='mt-2 p-3 glass-interactive rounded-lg'>
                 <input 
                   type="text"
                   value={newSubcategory}
@@ -586,7 +586,7 @@ const Add = ({token}) => {
                       setShowAddSubcategory(false);
                       setNewSubcategory('');
                     }}
-                    className='bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600'
+                    className='btn btn-ghost border border-white/30 px-4 py-1'
                   >
                     Cancel
                   </button>
@@ -628,7 +628,7 @@ const Add = ({token}) => {
             </div>
 
             {showAddMerchandise && (
-              <div className='mt-2 p-3 border rounded bg-gray-50'>
+              <div className='mt-2 p-3 glass-interactive rounded-lg'>
                 <p className='text-sm font-medium mb-2'>Add New Merchandise</p>
                 <div className='flex gap-2'>
                   <input
@@ -651,7 +651,7 @@ const Add = ({token}) => {
                       setShowAddMerchandise(false);
                       setNewMerchandise('');
                     }}
-                    className='px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500'
+                    className='btn btn-ghost border border-white/30 px-4 py-2'
                   >
                     Cancel
                   </button>
@@ -831,11 +831,11 @@ const Add = ({token}) => {
  </div>
 
  {useSizeVariants && sizeVariants.length > 0 && (
-  <div className='mt-4 p-4 bg-gray-50 border rounded'>
+  <div className='mt-4 p-4 glass-interactive rounded-lg'>
     <p className='mb-3 font-medium'>Set Price & Quantity for Each Size</p>
     <div className='space-y-3'>
       {sizeVariants.map((variant, index) => (
-        <div key={variant.size} className='flex gap-3 items-center bg-white p-3 rounded border'>
+        <div key={variant.size} className='flex gap-3 items-center glass-interactive p-3 rounded'>
           <div className='w-12 font-bold text-center'>{variant.size}</div>
           <div className='flex-1'>
             <label className='text-xs text-gray-600'>Price</label>
@@ -896,7 +896,7 @@ const Add = ({token}) => {
  </div>
         
 
-        <button type='submit' className='w-28 py-3 mt-4 bg-black text-white' disabled={isSubmitting}>
+        <button type='submit' className='btn btn-primary w-32 justify-center mt-4' disabled={isSubmitting}>
           {isSubmitting ? 'Adding...' : 'Add Product'}
         </button>
     </form>
