@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import axios from 'axios';
 import { backendURL } from '../App';
 import { toast } from 'react-toastify';
+import { assets } from '../assets/assets';
 const Login = ({setToken}) => {
 
     const [email, setEmail] = useState('');
@@ -26,23 +27,52 @@ const onSubmitHandler =async (e)=>{
 
 
   return (
-    <div className='min-h-screen flex items-center justify-center w-full'>
-        <div className='bg-white shadow-md rounded-lg px-8 py-6 max-w-md'>
-            <h1 className='text-2xl font-bold mb-4 '>Admin panel</h1>
-            <form onSubmit={onSubmitHandler}>
+    <div className='login-shell'>
+      <div className="ambient-orb orb-1" />
+      <div className="ambient-orb orb-2" />
+      <div className="ambient-orb orb-3" />
 
-                <div className='mb-3 min-w-72'>
-                    <p className='text-sm font-medium text-gray-700 mb-2 '>Email Address</p>
-                    <input onChange={(e)=>setEmail(e.target.value)} value={email} className='rounded-md w-full px-3 py-2 border border-gray-300 outline-none'  type="email" placeholder='your@email.com' required />
-                </div>
-                <div className='mb-3 min-w-72'>
-                    <p className='text-sm font-medium text-gray-700 mb-2 '>Password</p>
-                    <input onChange={(e)=>setPassword(e.target.value)} value={password} className='rounded-md w-full px-3 py-2 border border-gray-300 outline-none'  type="password" placeholder='your password' required />
-                </div>
-
-                <button className="mt-2 w-full py-2 px-4 rounded-md text-white bg-black " type='submit'>Login</button >
-            </form>
+      <div className='login-panel glass-card'>
+        <div className='flex items-center gap-3 mb-5'>
+          <div className='w-12 h-12 glass-elevated flex items-center justify-center rounded-xl'>
+            <img src={assets.logo} alt="Gift4Corp" className='w-9 h-9 object-contain' />
+          </div>
+          <div>
+            <p className='text-sm text-gray-300'>Gift4Corp Admin</p>
+            <h1 className='login-heading'>Welcome back</h1>
+          </div>
         </div>
+
+        <p className='login-subtitle'>Sign in to manage orders, products, and settings.</p>
+
+        <form onSubmit={onSubmitHandler} className='space-y-3'>
+          <div className='field'>
+            <label className='input-label'>Email Address</label>
+            <input
+              onChange={(e)=>setEmail(e.target.value)}
+              value={email}
+              className='glass-input glass-select'
+              type="email"
+              placeholder='admin@company.com'
+              required
+            />
+          </div>
+
+          <div className='field'>
+            <label className='input-label'>Password</label>
+            <input
+              onChange={(e)=>setPassword(e.target.value)}
+              value={password}
+              className='glass-input'
+              type="password"
+              placeholder='Enter your password'
+              required
+            />
+          </div>
+
+          <button className="btn btn-primary w-full justify-center" type='submit'>Sign in</button >
+        </form>
+      </div>
     </div>
   )
 }

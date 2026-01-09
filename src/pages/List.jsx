@@ -353,10 +353,10 @@ const handleUpdateProduct = async (e) => {
   return (
     <>
 
-    <p className='mb-2 '>All Products List</p>
+    <p className='mb-2 text-white text-xl font-semibold'>All Products List</p>
     
     {/* Filter Controls */}
-    <div className='flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 border rounded'>
+    <div className='flex flex-wrap gap-4 mb-4 p-4 glass-interactive rounded-lg'>
       <div className='flex flex-col gap-1'>
         <label className='text-sm font-medium'>Category</label>
         <select 
@@ -440,7 +440,7 @@ const handleUpdateProduct = async (e) => {
  {/*  list table title */}
 
  
-  <div className='hidden md:grid grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center py-1 px-2 border bg-gray-100 text-sm '>
+  <div className='hidden md:grid grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center py-1 px-2 glass-interactive text-sm text-white'>
     <b>Image</b>
     <b>Name</b>
     <b>Category</b>
@@ -463,7 +463,7 @@ const handleUpdateProduct = async (e) => {
       }
       
       return (
-               <div className='grid grid-cols-[1fr_3fr_1fr] md:grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 py-1 px-2 border text-sm ' key={index}>
+               <div className='grid grid-cols-[1fr_3fr_1fr] md:grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 py-2 px-2 glass-interactive text-sm text-white' key={index}>
                  <img className='w-12' src={item.image[0]} alt="" />
                  <p>{item.name}</p>
                  <p>{item.category}</p>
@@ -483,13 +483,13 @@ const handleUpdateProduct = async (e) => {
                  </p>
                  <button
                    onClick={() => openEditDialog(item)}
-                   className='text-blue-600 hover:text-blue-800 text-center cursor-pointer'
+                   className='text-blue-200 hover:text-blue-100 text-center cursor-pointer'
                  >
                    Edit
                  </button>
                  <p
                  onClick={()=>removeProduct(item._id)}
-                 className='text-right md:text-center cursor-pointer text-lg text-red-600 hover:text-red-800'>X</p>
+                 className='text-right md:text-center cursor-pointer text-lg text-red-300 hover:text-red-200'>X</p>
                </div>
       )
     }
@@ -499,19 +499,19 @@ const handleUpdateProduct = async (e) => {
 
         {/* Edit Dialog */}
         {showEditDialog && (
-          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
-            <div className='bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6'>
+          <div className='modal-overlay'>
+            <div className='glass-card modal-card'>
               <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-2xl font-bold'>Edit Product</h2>
+                <h2 className='text-2xl font-bold text-white'>Edit Product</h2>
                 <button
                   onClick={closeEditDialog}
-                  className='text-gray-500 hover:text-gray-700 text-2xl font-bold'
+                  className='text-gray-300 hover:text-white text-2xl font-bold'
                 >
                   ×
                 </button>
               </div>
 
-              <form onSubmit={handleUpdateProduct} className='flex flex-col gap-4'>
+              <form onSubmit={handleUpdateProduct} className='flex flex-col gap-4 text-white'>
                 {/* Product Name */}
                 <div>
                   <label className='block mb-2 font-medium'>Product Name</label>
@@ -710,8 +710,8 @@ const handleUpdateProduct = async (e) => {
                           onClick={() => handleSizeToggle(size)}
                           className={`px-4 py-2 border rounded ${
                             formData.sizes.includes(size)
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100'
+                              ? 'glass-elevated text-white'
+                              : 'glass-interactive text-gray-200'
                           }`}
                         >
                           {size}
@@ -721,11 +721,11 @@ const handleUpdateProduct = async (e) => {
                   </div>
 
                   {formData.useSizeVariants && formData.sizeVariants.length > 0 && (
-                    <div className='mt-4 p-4 bg-gray-50 border rounded'>
+                    <div className='mt-4 p-4 glass-interactive rounded-lg'>
                       <p className='mb-3 font-medium'>Set Price & Quantity for Each Size</p>
                       <div className='space-y-3'>
                         {formData.sizeVariants.map((variant, index) => (
-                          <div key={variant.size} className='flex gap-3 items-center bg-white p-3 rounded border'>
+                          <div key={variant.size} className='flex gap-3 items-center glass-interactive p-3 rounded'>
                             <div className='w-12 font-bold text-center'>{variant.size === 'XXXL' ? '3XL' : variant.size}</div>
                             <div className='flex-1'>
                               <label className='text-xs text-gray-600'>Price</label>
@@ -798,13 +798,11 @@ const handleUpdateProduct = async (e) => {
                       <div key={idx} className='relative w-20 h-20'>
                         {img ? (
                           <>
-                            <img src={img} alt='' className='w-20 h-20 object-cover border rounded' />
+                            <img src={img} alt='' className='w-20 h-20 object-cover border border-white/10 rounded' />
                             <button
                               type='button'
-                              className='absolute top-1 right-1 bg-white text-red-600 border rounded-full w-6 h-6 flex items-center justify-center shadow'
+                              className='absolute top-1 right-1 bg-black/60 text-red-200 border border-red-400/40 rounded-full w-6 h-6 flex items-center justify-center shadow'
                               onClick={() => {
-                                // Remove image from editProduct and formData only if user clicks delete
-                                // Mark image as deleted and remove from display
                                 const updatedImages = [...editProduct.image];
                                 updatedImages[idx] = null;
                                 setEditProduct(prev => ({ ...prev, image: updatedImages }));
@@ -816,7 +814,7 @@ const handleUpdateProduct = async (e) => {
                             </button>
                           </>
                         ) : (
-                          <div className='w-20 h-20 flex items-center justify-center border rounded bg-gray-100 text-gray-400'>No Image</div>
+                          <div className='w-20 h-20 flex items-center justify-center border border-white/10 rounded glass-interactive text-gray-200'>No Image</div>
                         )}
                       </div>
                     ))}
@@ -842,17 +840,17 @@ const handleUpdateProduct = async (e) => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className='flex gap-4 justify-end pt-4 border-t'>
+                <div className='flex gap-4 justify-end pt-4 border-t border-white/10'>
                   <button
                     type='button'
                     onClick={closeEditDialog}
-                    className='px-6 py-2 border rounded hover:bg-gray-100'
+                    className='btn btn-ghost border border-white/30'
                   >
                     Cancel
                   </button>
                   <button
                     type='submit'
-                    className='px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700'
+                    className='btn btn-primary'
                     disabled={isUpdating}
                   >
                     {isUpdating ? 'Updating...' : 'Update Product'}

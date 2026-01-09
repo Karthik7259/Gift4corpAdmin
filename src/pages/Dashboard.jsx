@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Dashboard = ({ token }) => {
   const navigate = useNavigate();
-  const [filterType, setFilterType] = useState('all'); // today, thisMonth, lastMonth, custom, all
+  const [filterType, setFilterType] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState({
@@ -20,9 +20,75 @@ const Dashboard = ({ token }) => {
     processingOrders: 0,
     totalProducts: 0,
   });
+  const [insights, setInsights] = useState({
+    avgOrderValue: 0,
+    avgItemsPerOrder: 0,
+    paymentSuccessRate: 0,
+    deliveryRate: 0,
+    repeatCustomerRate: 0,
+    uniqueCustomers: 0,
+    revenueChange: null,
+    ordersChange: null,
+  });
   const [recentOrders, setRecentOrders] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const getDateRange = () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    switch (filterType) {
+      case 'today': {
+        const startToday = new Date();
+        startToday.setHours(0, 0, 0, 0);
+        const endToday = new Date(startToday);
+        endToday.setDate(endToday.getDate() + 1);
+        return { start: startToday, end: endToday };
+      }
+      case 'thisMonth':
+        return { start: startOfMonth, end: startOfNextMonth };
+      case 'lastMonth': {
+        const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return { start: startLastMonth, end: startOfMonth };
+      }
+      case 'custom': {
+        if (!selectedMonth) return { start: null, end: null };
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 1);
+        return { start, end };
+      }
+      case 'all':
+      default:
+        return { start: null, end: null };
+    }
+  };
+
+  const getPreviousRange = (currentRange) => {
+    if (!currentRange || !currentRange.start || !currentRange.end) return null;
+    const duration = currentRange.end.getTime() - currentRange.start.getTime();
+    return {
+      start: new Date(currentRange.start.getTime() - duration),
+      end: new Date(currentRange.start.getTime()),
+    };
+  };
+
+  const filterOrders = (orders, range = getDateRange()) => {
+    if (!range || !range.start || !range.end) return orders;
+    return orders.filter(order => {
+      const orderDate = new Date(order.date);
+      return orderDate >= range.start && orderDate < range.end;
+    });
+  };
+
+  const buildDelta = (changeValue) => {
+    if (changeValue === null || Number.isNaN(changeValue) || !isFinite(changeValue)) return null;
+    const direction = changeValue >= 0 ? 'up' : 'down';
+    const formatted = `${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(1)}%`;
+    return { direction, value: formatted, label: 'vs previous period' };
+  };
 
   const fetchDashboardData = async () => {
     if (!token) return;
@@ -36,14 +102,13 @@ const Dashboard = ({ token }) => {
 
       if (response.data.success) {
         const allOrders = response.data.orders;
-        
-        // Filter orders based on selected filter
-        const filteredOrders = filterOrders(allOrders);
-        
+        const currentRange = getDateRange();
+        const previousRange = getPreviousRange(currentRange);
+        const filteredOrders = filterOrders(allOrders, currentRange);
+        const previousOrders = previousRange ? filterOrders(allOrders, previousRange) : [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Calculate statistics based on filtered orders
         const todayOrders = filteredOrders.filter(order => {
           const orderDate = new Date(order.date);
           orderDate.setHours(0, 0, 0, 0);
@@ -53,10 +118,11 @@ const Dashboard = ({ token }) => {
         const pendingPayments = filteredOrders.filter(order => !order.payment);
         const shippedOrders = filteredOrders.filter(order => order.status === 'Shipped');
         const deliveredOrders = filteredOrders.filter(order => order.status === 'Delivered');
-        const processingOrders = filteredOrders.filter(order => 
+        const processingOrders = filteredOrders.filter(order =>
           order.status !== 'Shipped' && order.status !== 'Delivered' && order.status !== 'Cancelled'
         );
 
+        const paidOrders = filteredOrders.filter(order => order.payment);
         const todayRevenue = todayOrders
           .filter(order => order.payment)
           .reduce((sum, order) => sum + order.amount, 0);
@@ -65,12 +131,19 @@ const Dashboard = ({ token }) => {
           .filter(order => order.payment)
           .reduce((sum, order) => sum + order.amount, 0);
 
-        // Count total products sold in filtered orders
         const totalProducts = filteredOrders.reduce((sum, order) => {
           return sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
         }, 0);
 
-        // Calculate top selling products
+        const uniqueCustomersSet = new Set();
+        filteredOrders.forEach(order => {
+          const address = order.address || {};
+          const emailKey = address.email ? address.email.toLowerCase() : '';
+          const phoneKey = address.phone || '';
+          const fallbackKey = `${address.firstName || ''}${address.lastName || ''}` || order._id;
+          uniqueCustomersSet.add(emailKey || phoneKey || fallbackKey || order._id);
+        });
+
         const productStats = {};
         filteredOrders.forEach(order => {
           order.items.forEach(item => {
@@ -92,10 +165,13 @@ const Dashboard = ({ token }) => {
           });
         });
 
-        // Sort by quantity sold and get top 10
         const topSellingProducts = Object.values(productStats)
           .sort((a, b) => b.quantitySold - a.quantitySold)
           .slice(0, 10);
+
+        const previousRevenue = previousOrders
+          .filter(order => order.payment)
+          .reduce((sum, order) => sum + order.amount, 0);
 
         setTopProducts(topSellingProducts);
 
@@ -110,8 +186,17 @@ const Dashboard = ({ token }) => {
           processingOrders: processingOrders.length,
           totalProducts: totalProducts,
         });
+        setInsights({
+          avgOrderValue: paidOrders.length ? totalRevenue / paidOrders.length : 0,
+          avgItemsPerOrder: filteredOrders.length ? totalProducts / filteredOrders.length : 0,
+          paymentSuccessRate: filteredOrders.length ? (paidOrders.length / filteredOrders.length) * 100 : 0,
+          deliveryRate: filteredOrders.length ? (deliveredOrders.length / filteredOrders.length) * 100 : 0,
+          repeatCustomerRate: filteredOrders.length ? ((filteredOrders.length - uniqueCustomersSet.size) / filteredOrders.length) * 100 : 0,
+          uniqueCustomers: uniqueCustomersSet.size,
+          revenueChange: previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : null,
+          ordersChange: previousOrders.length ? ((filteredOrders.length - previousOrders.length) / previousOrders.length) * 100 : null,
+        });
 
-        // Get 5 most recent filtered orders
         setRecentOrders(filteredOrders.slice(0, 5));
       } else {
         toast.error('Failed to fetch dashboard data');
@@ -124,51 +209,8 @@ const Dashboard = ({ token }) => {
     }
   };
 
-  const filterOrders = (orders) => {
-    const now = new Date();
-    
-    switch(filterType) {
-      case 'today':
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return orders.filter(order => {
-          const orderDate = new Date(order.date);
-          orderDate.setHours(0, 0, 0, 0);
-          return orderDate.getTime() === today.getTime();
-        });
-      
-      case 'thisMonth':
-        return orders.filter(order => {
-          const orderDate = new Date(order.date);
-          return orderDate.getMonth() === now.getMonth() && 
-                 orderDate.getFullYear() === now.getFullYear();
-        });
-      
-      case 'lastMonth':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return orders.filter(order => {
-          const orderDate = new Date(order.date);
-          return orderDate.getMonth() === lastMonth.getMonth() && 
-                 orderDate.getFullYear() === lastMonth.getFullYear();
-        });
-      
-      case 'custom':
-        if (!selectedMonth) return orders;
-        const [year, month] = selectedMonth.split('-');
-        return orders.filter(order => {
-          const orderDate = new Date(order.date);
-          return orderDate.getMonth() === parseInt(month) - 1 && 
-                 orderDate.getFullYear() === parseInt(year);
-        });
-      
-      case 'all':
-      default:
-        return orders;
-    }
-  };
-
   const getFilterLabel = () => {
-    switch(filterType) {
+    switch (filterType) {
       case 'today': return 'Today';
       case 'thisMonth': return 'This Month';
       case 'lastMonth': return 'Last Month';
@@ -182,281 +224,294 @@ const Dashboard = ({ token }) => {
     fetchDashboardData();
   }, [token, filterType, selectedMonth]);
 
+  const StatCard = ({ title, value, subtitle, accent, delta }) => (
+    <div className='glass-card stat-card'>
+      <div className='stat-glow' style={{ background: `radial-gradient(circle, ${accent || 'rgba(0, 122, 255, 0.25)'} 0%, transparent 65%)` }} />
+      <div className='stat-content'>
+        <p className='stat-title'>{title}</p>
+        <p className='stat-value'>{value}</p>
+        {subtitle && <p className='stat-sub'>{subtitle}</p>}
+        {delta && (
+          <div className={`trend ${delta.direction === 'up' ? 'up' : 'down'}`}>
+            <span>{delta.value}</span>
+            <span className='text-xs text-gray-200'>{delta.label}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className='flex items-center justify-center min-h-[60vh]'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto'></div>
-          <p className='mt-4 text-gray-600'>Loading dashboard...</p>
+        <div className='glass-card px-6 py-5 flex items-center gap-3'>
+          <div className='w-10 h-10 rounded-full skeleton' />
+          <div className='space-y-2'>
+            <div className='w-40 h-3 skeleton' />
+            <div className='w-24 h-3 skeleton' />
+          </div>
         </div>
       </div>
     );
   }
 
-  const StatCard = ({ title, value, icon, color, subtitle }) => (
-    <div className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${color} hover:shadow-lg transition-shadow`}>
-      <div className='flex justify-between items-start'>
-        <div>
-          <p className='text-gray-600 text-sm font-medium'>{title}</p>
-          <p className='text-3xl font-bold mt-2 text-gray-800'>{value}</p>
-          {subtitle && <p className='text-sm text-gray-500 mt-1'>{subtitle}</p>}
-        </div>
-        <div className='text-4xl'>{icon}</div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className='pb-8'>
-      <div className='flex justify-between items-center mb-6'>
-        <h2 className='text-3xl font-bold text-gray-800'>Dashboard</h2>
-        
-        {/* Filter Section */}
-        <div className='flex gap-3 items-center'>
-          <span className='text-sm font-medium text-gray-600'>Filter:</span>
-          <select
-            value={filterType}
-            onChange={(e) => {
-              setFilterType(e.target.value);
-              if (e.target.value !== 'custom') {
-                setSelectedMonth('');
-              }
-            }}
-            className='border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-          >
-            <option value='all'>All Time</option>
-            <option value='today'>Today</option>
-            <option value='thisMonth'>This Month</option>
-            <option value='lastMonth'>Last Month</option>
-            <option value='custom'>Custom Month</option>
-          </select>
-          
-          {filterType === 'custom' && (
-            <input
-              type='month'
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              max={new Date().toISOString().slice(0, 7)}
-              className='border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-            />
-          )}
-          
-          <div className='bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium'>
-            Showing: {getFilterLabel()}
+    <div className='space-y-6'>
+      <div className='section-card glass-card'>
+        <div className='section-title flex-wrap'>
+          <div>
+            <p className='text-sm text-gray-300'>Overview</p>
+            <h2 className='text-2xl font-bold text-white'>Dashboard</h2>
+          </div>
+          <div className='flex flex-wrap items-center gap-3'>
+            <div className='pill'>Showing: {getFilterLabel()}</div>
+            <select
+              value={filterType}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                if (e.target.value !== 'custom') {
+                  setSelectedMonth('');
+                }
+              }}
+              className='glass-input glass-select w-44'
+            >
+              <option value='all'>All Time</option>
+              <option value='today'>Today</option>
+              <option value='thisMonth'>This Month</option>
+              <option value='lastMonth'>Last Month</option>
+              <option value='custom'>Custom Month</option>
+            </select>
+
+            {filterType === 'custom' && (
+              <input
+                type='month'
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                max={new Date().toISOString().slice(0, 7)}
+                className='glass-input w-44'
+              />
+            )}
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
+      <div className='stat-grid'>
         <StatCard
           title='Total Orders'
           value={stats.totalOrders}
-          icon='📦'
-          color='border-blue-500'
           subtitle={`${stats.totalProducts} products sold`}
+          accent='rgba(0, 122, 255, 0.35)'
+          delta={buildDelta(insights.ordersChange)}
         />
         <StatCard
           title='Pending Payments'
           value={stats.pendingPayments}
-          icon='⏳'
-          color='border-yellow-500'
+          accent='rgba(255, 159, 10, 0.35)'
         />
         <StatCard
           title='Shipped Orders'
           value={stats.shippedOrders}
-          icon='🚚'
-          color='border-green-500'
+          accent='rgba(48, 209, 88, 0.35)'
         />
         <StatCard
           title='Delivered Orders'
           value={stats.deliveredOrders}
-          icon='✅'
-          color='border-purple-500'
+          accent='rgba(191, 90, 242, 0.35)'
         />
       </div>
 
-      {/* Additional Stats */}
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
+      <div className='stat-grid'>
         <StatCard
           title='Processing Orders'
           value={stats.processingOrders}
-          icon='⚙️'
-          color='border-orange-500'
+          accent='rgba(255, 214, 10, 0.28)'
         />
         <StatCard
           title='Total Revenue'
           value={`${currency}${stats.totalRevenue.toFixed(2)}`}
-          icon='💰'
-          color='border-green-600'
+          accent='rgba(48, 209, 88, 0.4)'
+          delta={buildDelta(insights.revenueChange)}
         />
         <StatCard
           title='Products Sold'
           value={stats.totalProducts}
-          icon='📊'
-          color='border-indigo-500'
+          accent='rgba(0, 122, 255, 0.3)'
         />
       </div>
 
-      {/* Recent Orders */}
-      <div className='bg-white rounded-lg shadow-md p-6 mb-8'>
-        <div className='flex justify-between items-center mb-4'>
-          <h3 className='text-xl font-semibold text-gray-800'>Recent Orders</h3>
-          <button
-            onClick={() => navigate('/orders')}
-            className='text-blue-600 hover:text-blue-800 text-sm font-medium'
-          >
-            View All →
-          </button>
-        </div>
-
-        {recentOrders.length === 0 ? (
-          <div className='text-center py-8 text-gray-500'>
-            <p>No orders yet</p>
-          </div>
-        ) : (
-          <div className='overflow-x-auto'>
-            <table className='w-full'>
-              <thead className='bg-gray-50 border-b'>
-                <tr>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Order ID</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Customer</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Items</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Amount</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Status</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Payment</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-gray-200'>
-                {recentOrders.map((order, index) => (
-                  <tr
-                    key={index}
-                    onClick={() => navigate(`/orders/${order._id}`)}
-                    className='hover:bg-gray-50 cursor-pointer transition-colors'
-                  >
-                    <td className='px-4 py-3 text-sm'>
-                      <span className='font-mono font-medium'>#{order._id.slice(-8).toUpperCase()}</span>
-                    </td>
-                    <td className='px-4 py-3 text-sm'>
-                      <div>
-                        <p className='font-medium'>{order.address.firstName} {order.address.lastName}</p>
-                        <p className='text-xs text-gray-500'>{order.address.city}</p>
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 text-sm'>{order.items.length}</td>
-                    <td className='px-4 py-3 text-sm font-semibold'>{currency}{order.amount}</td>
-                    <td className='px-4 py-3 text-sm'>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          order.status === 'Delivered'
-                            ? 'bg-green-100 text-green-800'
-                            : order.status === 'Shipped'
-                            ? 'bg-blue-100 text-blue-800'
-                            : order.status === 'Cancelled'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className='px-4 py-3 text-sm'>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          order.payment
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {order.payment ? 'Paid' : 'Pending'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className='stat-grid'>
+        <StatCard
+          title='Avg Order Value'
+          value={`${currency}${insights.avgOrderValue.toFixed(2)}`}
+          subtitle={`${insights.avgItemsPerOrder.toFixed(1)} items per order`}
+          accent='rgba(0, 122, 255, 0.28)'
+        />
+        <StatCard
+          title='Payment Success'
+          value={`${insights.paymentSuccessRate.toFixed(1)}%`}
+          subtitle={`${stats.pendingPayments} unpaid invoices`}
+          accent='rgba(48, 209, 88, 0.35)'
+        />
+        <StatCard
+          title='Delivery Rate'
+          value={`${insights.deliveryRate.toFixed(1)}%`}
+          subtitle={`${stats.deliveredOrders}/${stats.totalOrders || 0} delivered`}
+          accent='rgba(191, 90, 242, 0.32)'
+        />
+        <StatCard
+          title='Returning Customers'
+          value={`${insights.repeatCustomerRate.toFixed(1)}%`}
+          subtitle={`${insights.uniqueCustomers} unique buyers`}
+          accent='rgba(255, 214, 10, 0.32)'
+        />
       </div>
 
-      {/* Top Selling Products */}
-      <div className='bg-white rounded-lg shadow-md p-6'>
-        <div className='flex justify-between items-center mb-4'>
-          <h3 className='text-xl font-semibold text-gray-800'>Top Selling Products</h3>
-          <button
-            onClick={() => navigate('/list')}
-            className='text-blue-600 hover:text-blue-800 text-sm font-medium'
-          >
-            View All Products →
-          </button>
+      <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+        <div className='section-card glass-card table-shell'>
+          <div className='section-title'>
+            <h3 className='text-xl font-semibold text-white'>Recent Orders</h3>
+            <button
+              onClick={() => navigate('/orders')}
+              className='table-action'
+            >
+              View All
+            </button>
+          </div>
+
+          {recentOrders.length === 0 ? (
+            <div className='text-center py-8 text-gray-300'>
+              <p>No orders yet</p>
+            </div>
+          ) : (
+            <div className='scroll-area'>
+              <table className='glass-table'>
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Items</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.map((order, index) => (
+                    <tr
+                      key={index}
+                      onClick={() => navigate(`/orders/${order._id}`)}
+                      className='cursor-pointer'
+                    >
+                      <td>
+                        <span className='font-mono font-semibold'>#{order._id.slice(-8).toUpperCase()}</span>
+                      </td>
+                      <td>
+                        <div className='space-y-1'>
+                          <p className='font-medium text-white'>{order.address.firstName} {order.address.lastName}</p>
+                          <p className='text-xs text-gray-300'>{order.address.city}</p>
+                        </div>
+                      </td>
+                      <td>{order.items.length}</td>
+                      <td className='font-semibold text-green-300'>{currency}{order.amount}</td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            order.status === 'Delivered'
+                              ? 'success'
+                              : order.status === 'Shipped'
+                                ? 'info'
+                                : order.status === 'Cancelled'
+                                  ? 'error'
+                                  : 'warn'
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${order.payment ? 'success' : 'error'}`}>
+                          {order.payment ? 'Paid' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {topProducts.length === 0 ? (
-          <div className='text-center py-8 text-gray-500'>
-            <p>No products sold yet</p>
+        <div className='section-card glass-card table-shell'>
+          <div className='section-title'>
+            <h3 className='text-xl font-semibold text-white'>Top Selling Products</h3>
+            <button
+              onClick={() => navigate('/list')}
+              className='table-action'
+            >
+              View Products
+            </button>
           </div>
-        ) : (
-          <div className='overflow-x-auto'>
-            <table className='w-full'>
-              <thead className='bg-gray-50 border-b'>
-                <tr>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Rank</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Product</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Category</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Units Sold</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Orders</th>
-                  <th className='px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase'>Revenue</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-gray-200'>
-                {topProducts.map((product, index) => (
-                  <tr key={index} className='hover:bg-gray-50 transition-colors'>
-                    <td className='px-4 py-3 text-sm'>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                        index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                        index === 1 ? 'bg-gray-100 text-gray-700' :
-                        index === 2 ? 'bg-orange-100 text-orange-700' :
-                        'bg-blue-50 text-blue-600'
-                      }`}>
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 text-sm'>
-                      <div className='flex items-center gap-3'>
-                        {product.image && (
-                          <img 
-                            src={product.image} 
-                            alt={product.name}
-                            className='w-12 h-12 object-cover rounded border'
-                          />
-                        )}
-                        <div>
-                          <p className='font-medium text-gray-800'>{product.name}</p>
-                          <p className='text-xs text-gray-500'>ID: {product.id.slice(-8)}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 text-sm'>
-                      <span className='px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs'>
-                        {product.category || 'N/A'}
-                      </span>
-                    </td>
-                    <td className='px-4 py-3 text-sm'>
-                      <div className='flex items-center gap-2'>
-                        <span className='font-bold text-lg text-blue-600'>{product.quantitySold}</span>
-                        <span className='text-gray-500 text-xs'>units</span>
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 text-sm font-medium'>{product.orderCount}</td>
-                    <td className='px-4 py-3 text-sm font-semibold text-green-600'>
-                      {currency}{product.revenue.toFixed(2)}
-                    </td>
+
+          {topProducts.length === 0 ? (
+            <div className='text-center py-8 text-gray-300'>
+              <p>No products sold yet</p>
+            </div>
+          ) : (
+            <div className='scroll-area'>
+              <table className='glass-table'>
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Units Sold</th>
+                    <th>Orders</th>
+                    <th>Revenue</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {topProducts.map((product, index) => (
+                    <tr key={index}>
+                      <td>
+                        <div className='w-9 h-9 glass-elevated rounded-full flex items-center justify-center font-semibold'>
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td>
+                        <div className='flex items-center gap-3'>
+                          {product.image && (
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className='w-12 h-12 object-cover rounded border border-white/10'
+                            />
+                          )}
+                          <div>
+                            <p className='font-medium text-white'>{product.name}</p>
+                            <p className='text-xs text-gray-300'>ID: {product.id.slice(-8)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className='badge info'>{product.category || 'N/A'}</span>
+                      </td>
+                      <td>
+                        <div className='flex items-center gap-2'>
+                          <span className='font-bold text-lg text-blue-200'>{product.quantitySold}</span>
+                          <span className='text-gray-400 text-xs'>units</span>
+                        </div>
+                      </td>
+                      <td className='font-medium'>{product.orderCount}</td>
+                      <td className='font-semibold text-green-300'>
+                        {currency}{product.revenue.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
