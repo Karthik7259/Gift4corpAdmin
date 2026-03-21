@@ -147,7 +147,11 @@ const Dashboard = ({ token }) => {
         const productStats = {};
         filteredOrders.forEach(order => {
           order.items.forEach(item => {
-            const productId = item._id;
+            const rawId = item._id ?? item.id;
+            const productId =
+              rawId != null && String(rawId).trim() !== ''
+                ? String(rawId)
+                : `${item.name || 'product'}|${item.size ?? ''}`;
             if (!productStats[productId]) {
               productStats[productId] = {
                 id: productId,
@@ -488,7 +492,12 @@ const Dashboard = ({ token }) => {
                           )}
                           <div>
                             <p className='font-medium text-white'>{product.name}</p>
-                            <p className='text-xs text-gray-300'>ID: {product.id.slice(-8)}</p>
+                            <p className='text-xs text-gray-300'>
+                              ID:{' '}
+                              {product.id != null && String(product.id).length > 0
+                                ? String(product.id).slice(-8)
+                                : 'N/A'}
+                            </p>
                           </div>
                         </div>
                       </td>
