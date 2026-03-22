@@ -68,8 +68,11 @@ const subCategoryOptions = {
 
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { backendURL, currency } from '../App';
 import { toast } from 'react-toastify';
+import { assets } from '../assets/assets';
+import ProductImageThumbnails from '../components/ProductImageThumbnails';
 
 const List = ({token}) => {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -116,7 +119,7 @@ const List = ({token}) => {
    useSizeVariants: false,
    sizeVariants: []
  });
- const [images, setImages] = useState([null, null, null, null]);
+ const [images, setImages] = useState([null, null, null, null, null, null]);
  const [deletedImages, setDeletedImages] = useState([]);
 
  const fetchList = async() => {
@@ -190,7 +193,7 @@ const openEditDialog = (product) => {
     useSizeVariants: hasSizeVariants,
     sizeVariants: hasSizeVariants ? product.sizeVariants : []
   });
-  setImages([null, null, null, null]);
+  setImages([null, null, null, null, null, null]);
   setDeletedImages([]);
   setShowEditDialog(true);
 }
@@ -214,7 +217,7 @@ const closeEditDialog = () => {
     useSizeVariants: false,
     sizeVariants: []
   });
-  setImages([null, null, null, null]);
+  setImages([null, null, null, null, null, null]);
 }
 
 const handleInputChange = (e) => {
@@ -306,8 +309,6 @@ const handleUpdateProduct = async (e) => {
     setIsUpdating(false);
   }
 }
-``
-
 
 
  useEffect(() => {
@@ -317,6 +318,20 @@ const handleUpdateProduct = async (e) => {
  useEffect(() => {
   applyFilters();
  }, [list, stockFilter, priceSort, lowStockThreshold, categoryFilter, subCategoryFilter]);
+
+ useEffect(() => {
+   if (!showEditDialog) return;
+   const onKeyDown = (e) => {
+     if (e.key === 'Escape') closeEditDialog();
+   };
+   document.addEventListener('keydown', onKeyDown);
+   const prevOverflow = document.body.style.overflow;
+   document.body.style.overflow = 'hidden';
+   return () => {
+     document.removeEventListener('keydown', onKeyDown);
+     document.body.style.overflow = prevOverflow;
+   };
+ }, [showEditDialog]);
 
  const applyFilters = () => {
   let filtered = [...list];
@@ -464,7 +479,13 @@ const handleUpdateProduct = async (e) => {
       
       return (
                <div className='grid grid-cols-[1fr_3fr_1fr] md:grid-cols-[1fr_3fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 py-2 px-2 glass-interactive text-sm text-white' key={index}>
-                 <img className='w-12' src={item.image[0]} alt="" />
+                 <ProductImageThumbnails
+                   source={item.image}
+                   sizeClass='w-9 h-9'
+                   className='max-w-[7.5rem]'
+                   fallbackSrc={assets.parcel_icon}
+                   alt={item.name}
+                 />
                  <p>{item.name}</p>
                  <p>{item.category}</p>
                  <p>{currency}{item.price}</p>
@@ -497,43 +518,61 @@ const handleUpdateProduct = async (e) => {
    }
         </div>
 
-        {/* Edit Dialog */}
-        {showEditDialog && (
-          <div className='modal-overlay'>
-            <div className='glass-card modal-card'>
-              <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-2xl font-bold text-white'>Edit Product</h2>
+        {/* Edit Dialog — mount on document.body so fixed positioning isn’t clipped by .content-surface (backdrop-filter creates a containing block) */}
+        {showEditDialog &&
+          createPortal(
+          <div
+            className='modal-overlay'
+            role='presentation'
+            onClick={closeEditDialog}
+          >
+            <div
+              className='modal-dialog'
+              role='dialog'
+              aria-modal='true'
+              aria-labelledby='edit-product-dialog-title'
+              onClick={(e) => e.stopPropagation()}
+            >
+              <header className='modal-dialog-header'>
+                <h2 id='edit-product-dialog-title'>Edit Product</h2>
                 <button
+                  type='button'
+                  className='modal-dialog-close'
                   onClick={closeEditDialog}
-                  className='text-gray-300 hover:text-white text-2xl font-bold'
+                  aria-label='Close'
                 >
                   ×
                 </button>
-              </div>
+              </header>
 
-              <form onSubmit={handleUpdateProduct} className='flex flex-col gap-4 text-white'>
+              <form
+                onSubmit={handleUpdateProduct}
+                className='flex flex-col flex-1 min-h-0 overflow-hidden text-white'
+              >
+                <div className='modal-dialog-body'>
+                  <div className='flex flex-col gap-6'>
                 {/* Product Name */}
                 <div>
-                  <label className='block mb-2 font-medium'>Product Name</label>
+                  <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Product Name</label>
                   <input
                     type='text'
                     name='name'
                     value={formData.name}
                     onChange={handleInputChange}
-                    className='w-full px-3 py-2 border rounded'
+                    className='w-full glass-input'
                     required
                   />
                 </div>
 
                 {/* Product Description */}
                 <div>
-                  <label className='block mb-2 font-medium'>Product Description</label>
+                  <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Product Description</label>
                   <textarea
                     name='description'
                     value={formData.description}
                     onChange={handleInputChange}
-                    className='w-full px-3 py-2 border rounded'
-                    rows='4'
+                    className='w-full glass-input modal-dialog-textarea'
+                    rows={10}
                     required
                   />
                 </div>
@@ -541,7 +580,7 @@ const handleUpdateProduct = async (e) => {
                 {/* Category and SubCategory */}
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
-                    <label className='block mb-2 font-medium'>Category</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Category</label>
                     <select
                       name='category'
                       value={formData.category}
@@ -553,7 +592,7 @@ const handleUpdateProduct = async (e) => {
                           subCategory: (subCategoryOptions[newCategory] && subCategoryOptions[newCategory][0]) || ''
                         }));
                       }}
-                      className='w-full px-3 py-2 border rounded'
+                      className='w-full glass-input glass-select'
                     >
                       {Object.keys(subCategoryOptions).map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
@@ -562,12 +601,12 @@ const handleUpdateProduct = async (e) => {
                   </div>
 
                   <div>
-                    <label className='block mb-2 font-medium'>Sub Category</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Sub Category</label>
                     <select
                       name='subCategory'
                       value={formData.subCategory}
                       onChange={handleInputChange}
-                      className='w-full px-3 py-2 border rounded'
+                      className='w-full glass-input glass-select'
                     >
                       {(() => {
                         const categoryData = categories.find(cat => cat.name === formData.category);
@@ -585,25 +624,25 @@ const handleUpdateProduct = async (e) => {
                 {/* Price and MRP */}
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
-                    <label className='block mb-2 font-medium'>Price</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Price</label>
                     <input
                       type='number'
                       name='price'
                       value={formData.price}
                       onChange={handleInputChange}
-                      className='w-full px-3 py-2 border rounded'
+                      className='w-full glass-input'
                       required
                     />
                   </div>
 
                   <div>
-                    <label className='block mb-2 font-medium'>MRP Price</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>MRP Price</label>
                     <input
                       type='number'
                       name='Mrpprice'
                       value={formData.Mrpprice}
                       onChange={handleInputChange}
-                      className='w-full px-3 py-2 border rounded'
+                      className='w-full glass-input'
                       required
                     />
                   </div>
@@ -614,53 +653,53 @@ const handleUpdateProduct = async (e) => {
                   {/* Only show general quantity if not using size variants */}
                   {!formData.useSizeVariants && (
                     <div>
-                      <label className='block mb-2 font-medium'>Quantity</label>
+                      <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Quantity</label>
                       <input
                         type='number'
                         name='quantity'
                         value={formData.quantity}
                         onChange={handleInputChange}
                         min='0'
-                        className='w-full px-3 py-2 border rounded'
+                        className='w-full glass-input'
                         required
                       />
                     </div>
                   )}
                   <div>
-                    <label className='block mb-2 font-medium'>Color</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Color</label>
                     <input
                       type='text'
                       name='color'
                       value={formData.color}
                       onChange={handleInputChange}
                       placeholder='e.g., Red, Blue'
-                      className='w-full px-3 py-2 border rounded'
+                      className='w-full glass-input'
                     />
                   </div>
 
                   <div>
-                    <label className='block mb-2 font-medium'>Brand</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Brand</label>
                     <input
                       type='text'
                       name='brand'
                       value={formData.brand}
                       onChange={handleInputChange}
                       placeholder='e.g., Nike, Adidas'
-                      className='w-full px-3 py-2 border rounded'
+                      className='w-full glass-input'
                     />
                   </div>
                 </div>
 
                 {/* College Merchandise */}
                 <div>
-                  <label className='block mb-2 font-medium'>College Merchandise (Optional)</label>
+                  <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>College Merchandise (Optional)</label>
                   <input
                     type='text'
                     name='collegeMerchandise'
                     value={formData.collegeMerchandise}
                     onChange={handleInputChange}
                     placeholder='e.g., IIT Delhi, IIM Ahmedabad'
-                    className='w-full px-3 py-2 border rounded'
+                    className='w-full glass-input'
                   />
                 </div>
 
@@ -701,7 +740,7 @@ const handleUpdateProduct = async (e) => {
                   </div>
 
                   <div>
-                    <label className='block mb-2 font-medium'>Sizes</label>
+                    <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Sizes</label>
                     <div className='flex gap-2 flex-wrap'>
                       {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(size => (
                         <button
@@ -725,10 +764,10 @@ const handleUpdateProduct = async (e) => {
                       <p className='mb-3 font-medium'>Set Price & Quantity for Each Size</p>
                       <div className='space-y-3'>
                         {formData.sizeVariants.map((variant, index) => (
-                          <div key={variant.size} className='flex gap-3 items-center glass-interactive p-3 rounded'>
+                          <div key={variant.size} className='flex flex-col sm:flex-row sm:items-end gap-3 glass-interactive p-3 rounded'>
                             <div className='w-12 font-bold text-center'>{variant.size === 'XXXL' ? '3XL' : variant.size}</div>
                             <div className='flex-1'>
-                              <label className='text-xs text-gray-600'>Price</label>
+                              <label className='text-xs font-medium text-gray-300'>Price</label>
                               <input 
                                 type="number"
                                 value={variant.price}
@@ -737,12 +776,12 @@ const handleUpdateProduct = async (e) => {
                                   updated[index].price = e.target.value;
                                   setFormData(prev => ({ ...prev, sizeVariants: updated }));
                                 }}
-                                className='w-full px-2 py-1 border rounded'
+                                className='w-full glass-input'
                                 placeholder='Price'
                               />
                             </div>
                             <div className='flex-1'>
-                              <label className='text-xs text-gray-600'>MRP Price</label>
+                              <label className='text-xs font-medium text-gray-300'>MRP Price</label>
                               <input 
                                 type="number"
                                 value={variant.mrpPrice}
@@ -751,12 +790,12 @@ const handleUpdateProduct = async (e) => {
                                   updated[index].mrpPrice = e.target.value;
                                   setFormData(prev => ({ ...prev, sizeVariants: updated }));
                                 }}
-                                className='w-full px-2 py-1 border rounded'
+                                className='w-full glass-input'
                                 placeholder='MRP'
                               />
                             </div>
                             <div className='flex-1'>
-                              <label className='text-xs text-gray-600'>Quantity</label>
+                              <label className='text-xs font-medium text-gray-300'>Quantity</label>
                               <input 
                                 type="number"
                                 value={variant.quantity}
@@ -765,7 +804,7 @@ const handleUpdateProduct = async (e) => {
                                   updated[index].quantity = e.target.value;
                                   setFormData(prev => ({ ...prev, sizeVariants: updated }));
                                 }}
-                                className='w-full px-2 py-1 border rounded'
+                                className='w-full glass-input'
                                 placeholder='Stock'
                                 min='0'
                               />
@@ -792,9 +831,9 @@ const handleUpdateProduct = async (e) => {
 
                 {/* Current Images with delete option */}
                 <div>
-                  <label className='block mb-2 font-medium'>Current Images</label>
+                  <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Current Images</label>
                   <div className='flex gap-2 flex-wrap'>
-                    {editProduct.image.map((img, idx) => (
+                    {(Array.isArray(editProduct.image) ? editProduct.image : []).map((img, idx) => (
                       <div key={idx} className='relative w-20 h-20'>
                         {img ? (
                           <>
@@ -823,11 +862,11 @@ const handleUpdateProduct = async (e) => {
 
                 {/* Upload New Images (replaces deleted or empty slots) */}
                 <div>
-                  <label className='block mb-2 font-medium'>Upload New Images (Optional)</label>
-                  <div className='grid grid-cols-2 md:grid-cols-4 gap-2'>
-                    {[0, 1, 2, 3].map((idx) => (
+                  <label className='block mb-2.5 text-sm font-semibold tracking-wide text-white/85'>Upload new images (optional, up to 6 slots)</label>
+                  <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2'>
+                    {[0, 1, 2, 3, 4, 5].map((idx) => (
                       <div key={idx}>
-                        <label className='block text-sm mb-1'>Image {idx + 1}</label>
+                        <label className='block text-xs font-medium mb-1.5 text-white/70'>Image {idx + 1}</label>
                         <input
                           type='file'
                           accept='image/*'
@@ -839,8 +878,10 @@ const handleUpdateProduct = async (e) => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className='flex gap-4 justify-end pt-4 border-t border-white/10'>
+                  </div>
+                </div>
+
+                <footer className='modal-dialog-footer'>
                   <button
                     type='button'
                     onClick={closeEditDialog}
@@ -855,11 +896,12 @@ const handleUpdateProduct = async (e) => {
                   >
                     {isUpdating ? 'Updating...' : 'Update Product'}
                   </button>
-                </div>
+                </footer>
               </form>
             </div>
-          </div>
-        )}
+          </div>,
+            document.body
+          )}
     </>
   )
 }

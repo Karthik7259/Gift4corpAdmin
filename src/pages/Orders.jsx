@@ -6,6 +6,8 @@ import { backendURL, currency } from '../App'
 import { toast } from 'react-toastify'
 import { assets } from '../assets/assets'
 import { useNavigate } from 'react-router-dom'
+import ProductImageThumbnails from '../components/ProductImageThumbnails'
+import { getOrderPreviewImages } from '../utils/productImages'
 
 const Orders = ({ token }) => {
   const navigate = useNavigate()
@@ -55,6 +57,7 @@ const Orders = ({ token }) => {
   useEffect(() => {
     fetchAllOrders()
   }, [token])
+
   return (
     <div className='space-y-4'>
       <div className='section-title'>
@@ -72,7 +75,13 @@ const Orders = ({ token }) => {
             onClick={() => navigate(`/orders/${order._id}`)}
           >
             <div className='flex flex-col gap-2 items-start'>
-              <img className='w-12 h-12 object-contain' src={assets.parcel_icon} alt="" />
+              <ProductImageThumbnails
+                source={getOrderPreviewImages(order)}
+                sizeClass='w-9 h-9'
+                className='max-w-[6.5rem]'
+                fallbackSrc={assets.parcel_icon}
+                alt='Order items'
+              />
               <span className='pill-small font-mono'>#{order._id.slice(-8).toUpperCase()}</span>
             </div>
             <div className='space-y-2'>

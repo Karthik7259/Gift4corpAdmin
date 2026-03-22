@@ -4,6 +4,7 @@ import axios from 'axios'
 import { backendURL, currency } from '../App'
 import { toast } from 'react-toastify'
 import { assets } from '../assets/assets'
+import ProductImageThumbnails from '../components/ProductImageThumbnails'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -386,11 +387,15 @@ const OrderDetails = ({ token }) => {
                 key={index}
                 className="glass-interactive p-4 flex items-start gap-4"
               >
-                <img
-                  src={item.image?.[0] || assets.parcel_icon}
-                  alt={item.name}
-                  className="w-20 h-20 object-cover rounded"
-                />
+                <div className="shrink-0 max-w-[9rem]">
+                  <ProductImageThumbnails
+                    source={item.image}
+                    max={6}
+                    sizeClass="w-14 h-14"
+                    fallbackSrc={assets.parcel_icon}
+                    alt={item.name}
+                  />
+                </div>
                 <div className="flex-1">
                   <h4 className="font-semibold text-white">{item.name}</h4>
                   <p className="text-sm text-gray-300 mt-1">

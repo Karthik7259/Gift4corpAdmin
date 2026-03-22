@@ -9,6 +9,8 @@ const Add = ({token}) => {
  const [image2, setImage2] = useState(false);
  const [image3, setImage3] = useState(false);
  const [image4, setImage4] = useState(false);
+ const [image5, setImage5] = useState(false);
+ const [image6, setImage6] = useState(false);
  const [isSubmitting, setIsSubmitting] = useState(false);
 
 
@@ -366,6 +368,8 @@ const Add = ({token}) => {
       image2 && formData.append('image2', image2);
       image3 && formData.append('image3', image3);
       image4 && formData.append('image4', image4);
+      image5 && formData.append('image5', image5);
+      image6 && formData.append('image6', image6);
       formData.append('name', name);
       formData.append('description', description);
       formData.append('price', price);
@@ -405,10 +409,12 @@ const Add = ({token}) => {
         setSizeVariants([]);
         setUseSizeVariants(false);
         setBestseller(false);
-        setImage1('');  
-        setImage2('');                 
+        setImage1('');
+        setImage2('');
         setImage3('');
         setImage4('');
+        setImage5('');
+        setImage6('');
       }else{
         toast.error(response.data.message );
       }
@@ -424,8 +430,8 @@ const Add = ({token}) => {
     onSubmit={onSubmitHandler}
     className='section-card glass-card flex flex-col w-full items-start gap-4 text-white' >
          <div>
-          <p className='mb-2'>Upload Image</p>
-          <div className='flex gap-2'>
+          <p className='mb-2'>Upload images (up to 6; first image required)</p>
+          <div className='flex flex-wrap gap-2'>
             <label htmlFor="image1">
               <img className='w-20' src={!image1? assets.upload_area : URL.createObjectURL(image1)} alt="" />
               <input onChange={(e)=>setImage1(e.target.files[0])}  type="file" id='image1' hidden />
@@ -442,7 +448,14 @@ const Add = ({token}) => {
               <img className='w-20' src={!image4? assets.upload_area : URL.createObjectURL(image4)} alt="" />
               <input onChange={(e)=> setImage4(e.target.files[0])} type="file" id='image4' hidden />
             </label>
-            
+            <label htmlFor="image5">
+              <img className='w-20' src={!image5? assets.upload_area : URL.createObjectURL(image5)} alt="" />
+              <input onChange={(e)=> setImage5(e.target.files[0])} type="file" id='image5' hidden />
+            </label>
+            <label htmlFor="image6">
+              <img className='w-20' src={!image6? assets.upload_area : URL.createObjectURL(image6)} alt="" />
+              <input onChange={(e)=> setImage6(e.target.files[0])} type="file" id='image6' hidden />
+            </label>
             </div>   
          </div>
 

@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { assets } from '../assets/assets';
 import axios from 'axios';
 import { backendURL, currency } from '../App';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import ProductImageThumbnails from '../components/ProductImageThumbnails';
+import { getProductImageList, getOrderPreviewImages, MAX_PRODUCT_IMAGES } from '../utils/productImages';
 
 const Dashboard = ({ token }) => {
   const navigate = useNavigate();
@@ -26,13 +29,38 @@ const Dashboard = ({ token }) => {
     paymentSuccessRate: 0,
     deliveryRate: 0,
     repeatCustomerRate: 0,
+    repeatBuyers: 0,
     uniqueCustomers: 0,
     revenueChange: null,
     ordersChange: null,
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  const [catalogStats, setCatalogStats] = useState({
+    listedProducts: 0,
+    lowStock: 0,
+    outOfStock: 0,
+  });
   const [loading, setLoading] = useState(true);
+
+  const customerKey = (order) => {
+    const address = order.address || {};
+    const emailKey = address.email ? address.email.toLowerCase() : '';
+    const phoneKey = address.phone || '';
+    return (
+      emailKey ||
+      phoneKey ||
+      `${address.firstName || ''}${address.lastName || ''}`.trim() ||
+      String(order.userId || order._id)
+    );
+  };
+
+  const productStockTotal = (p) => {
+    if (p.sizeVariants && p.sizeVariants.length > 0) {
+      return p.sizeVariants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0);
+    }
+    return Number(p.quantity) || 0;
+  };
 
   const getDateRange = () => {
     const now = new Date();
@@ -93,15 +121,36 @@ const Dashboard = ({ token }) => {
   const fetchDashboardData = async () => {
     if (!token) return;
 
+    setLoading(true);
     try {
-      const response = await axios.post(
-        backendURL + '/api/order/list',
-        {},
-        { headers: { token } }
-      );
+      const [orderRes, productRes] = await Promise.all([
+        axios.post(backendURL + '/api/order/list', {}, { headers: { token } }),
+        axios.get(backendURL + '/api/product/list').catch(() => ({ data: { success: false } })),
+      ]);
 
-      if (response.data.success) {
-        const allOrders = response.data.orders;
+      if (productRes.data?.success && Array.isArray(productRes.data.products)) {
+        const products = productRes.data.products;
+        let lowStock = 0;
+        let outOfStock = 0;
+        const threshold = 10;
+        products.forEach((p) => {
+          const stock = productStockTotal(p);
+          if (stock <= 0) outOfStock += 1;
+          else if (stock <= threshold) lowStock += 1;
+        });
+        setCatalogStats({
+          listedProducts: products.length,
+          lowStock,
+          outOfStock,
+        });
+      } else {
+        setCatalogStats({ listedProducts: 0, lowStock: 0, outOfStock: 0 });
+      }
+
+      if (orderRes.data.success) {
+        const allOrders = [...orderRes.data.orders].sort(
+          (a, b) => Number(b.date) - Number(a.date)
+        );
         const currentRange = getDateRange();
         const previousRange = getPreviousRange(currentRange);
         const filteredOrders = filterOrders(allOrders, currentRange);
@@ -132,21 +181,26 @@ const Dashboard = ({ token }) => {
           .reduce((sum, order) => sum + order.amount, 0);
 
         const totalProducts = filteredOrders.reduce((sum, order) => {
-          return sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
+          const items = order.items || [];
+          return sum + items.reduce((itemSum, item) => itemSum + item.quantity, 0);
         }, 0);
 
-        const uniqueCustomersSet = new Set();
-        filteredOrders.forEach(order => {
-          const address = order.address || {};
-          const emailKey = address.email ? address.email.toLowerCase() : '';
-          const phoneKey = address.phone || '';
-          const fallbackKey = `${address.firstName || ''}${address.lastName || ''}` || order._id;
-          uniqueCustomersSet.add(emailKey || phoneKey || fallbackKey || order._id);
+        const orderCountByCustomer = {};
+        filteredOrders.forEach((order) => {
+          const k = customerKey(order);
+          orderCountByCustomer[k] = (orderCountByCustomer[k] || 0) + 1;
         });
+        const uniqueCustomerKeys = Object.keys(orderCountByCustomer);
+        const uniqueCustomers = uniqueCustomerKeys.length;
+        const repeatBuyerCount = uniqueCustomerKeys.filter(
+          (k) => orderCountByCustomer[k] > 1
+        ).length;
+        const repeatCustomerRate =
+          uniqueCustomers > 0 ? (repeatBuyerCount / uniqueCustomers) * 100 : 0;
 
         const productStats = {};
-        filteredOrders.forEach(order => {
-          order.items.forEach(item => {
+        filteredOrders.forEach((order) => {
+          (order.items || []).forEach((item) => {
             const rawId = item._id ?? item.id;
             const productId =
               rawId != null && String(rawId).trim() !== ''
@@ -156,12 +210,18 @@ const Dashboard = ({ token }) => {
               productStats[productId] = {
                 id: productId,
                 name: item.name,
-                image: item.image ? item.image[0] : null,
+                images: [],
                 category: item.category,
                 quantitySold: 0,
                 revenue: 0,
                 orderCount: 0
               };
+            }
+            const incoming = getProductImageList(item.image);
+            if (incoming.length) {
+              productStats[productId].images = [
+                ...new Set([...productStats[productId].images, ...incoming]),
+              ].slice(0, MAX_PRODUCT_IMAGES);
             }
             productStats[productId].quantitySold += item.quantity;
             productStats[productId].revenue += item.price * item.quantity;
@@ -195,15 +255,18 @@ const Dashboard = ({ token }) => {
           avgItemsPerOrder: filteredOrders.length ? totalProducts / filteredOrders.length : 0,
           paymentSuccessRate: filteredOrders.length ? (paidOrders.length / filteredOrders.length) * 100 : 0,
           deliveryRate: filteredOrders.length ? (deliveredOrders.length / filteredOrders.length) * 100 : 0,
-          repeatCustomerRate: filteredOrders.length ? ((filteredOrders.length - uniqueCustomersSet.size) / filteredOrders.length) * 100 : 0,
-          uniqueCustomers: uniqueCustomersSet.size,
+          repeatCustomerRate,
+          repeatBuyers: repeatBuyerCount,
+          uniqueCustomers,
           revenueChange: previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : null,
           ordersChange: previousOrders.length ? ((filteredOrders.length - previousOrders.length) / previousOrders.length) * 100 : null,
         });
 
         setRecentOrders(filteredOrders.slice(0, 5));
       } else {
-        toast.error('Failed to fetch dashboard data');
+        toast.error(orderRes.data?.message || 'Failed to fetch orders');
+        setRecentOrders([]);
+        setTopProducts([]);
       }
     } catch (error) {
       console.error('Dashboard error:', error);
@@ -303,7 +366,7 @@ const Dashboard = ({ token }) => {
         <StatCard
           title='Total Orders'
           value={stats.totalOrders}
-          subtitle={`${stats.totalProducts} products sold`}
+          subtitle={`${stats.totalProducts} units sold in period`}
           accent='rgba(0, 122, 255, 0.35)'
           delta={buildDelta(insights.ordersChange)}
         />
@@ -337,9 +400,31 @@ const Dashboard = ({ token }) => {
           delta={buildDelta(insights.revenueChange)}
         />
         <StatCard
-          title='Products Sold'
+          title='Units Sold'
           value={stats.totalProducts}
+          subtitle={`${catalogStats.listedProducts} products in catalog`}
           accent='rgba(0, 122, 255, 0.3)'
+        />
+      </div>
+
+      <div className='stat-grid'>
+        <StatCard
+          title='Products Listed'
+          value={catalogStats.listedProducts}
+          subtitle='From product list'
+          accent='rgba(0, 122, 255, 0.25)'
+        />
+        <StatCard
+          title='Low Stock'
+          value={catalogStats.lowStock}
+          subtitle="≤10 units (excl. out of stock)"
+          accent='rgba(255, 159, 10, 0.35)'
+        />
+        <StatCard
+          title='Out of Stock'
+          value={catalogStats.outOfStock}
+          subtitle='Zero total inventory'
+          accent='rgba(255, 69, 58, 0.3)'
         />
       </div>
 
@@ -363,9 +448,9 @@ const Dashboard = ({ token }) => {
           accent='rgba(191, 90, 242, 0.32)'
         />
         <StatCard
-          title='Returning Customers'
+          title='Repeat Buyers'
           value={`${insights.repeatCustomerRate.toFixed(1)}%`}
-          subtitle={`${insights.uniqueCustomers} unique buyers`}
+          subtitle={`${insights.repeatBuyers} of ${insights.uniqueCustomers} customers ordered more than once`}
           accent='rgba(255, 214, 10, 0.32)'
         />
       </div>
@@ -400,9 +485,9 @@ const Dashboard = ({ token }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentOrders.map((order, index) => (
+                  {recentOrders.map((order) => (
                     <tr
-                      key={index}
+                      key={order._id}
                       onClick={() => navigate(`/orders/${order._id}`)}
                       className='cursor-pointer'
                     >
@@ -411,11 +496,26 @@ const Dashboard = ({ token }) => {
                       </td>
                       <td>
                         <div className='space-y-1'>
-                          <p className='font-medium text-white'>{order.address.firstName} {order.address.lastName}</p>
-                          <p className='text-xs text-gray-300'>{order.address.city}</p>
+                          <p className='font-medium text-white'>
+                            {order.address?.firstName || ''} {order.address?.lastName || ''}
+                          </p>
+                          <p className='text-xs text-gray-300'>{order.address?.city || '—'}</p>
                         </div>
                       </td>
-                      <td>{order.items.length}</td>
+                      <td>
+                        <div className='flex items-center gap-2 flex-wrap'>
+                          <ProductImageThumbnails
+                            source={getOrderPreviewImages(order)}
+                            sizeClass='w-8 h-8'
+                            className='max-w-[5.5rem]'
+                            fallbackSrc={assets.parcel_icon}
+                            alt='Order items'
+                          />
+                          <span className='text-gray-300 text-sm tabular-nums'>
+                            {(order.items || []).length}
+                          </span>
+                        </div>
+                      </td>
                       <td className='font-semibold text-green-300'>{currency}{order.amount}</td>
                       <td>
                         <span
@@ -475,7 +575,7 @@ const Dashboard = ({ token }) => {
                 </thead>
                 <tbody>
                   {topProducts.map((product, index) => (
-                    <tr key={index}>
+                    <tr key={product.id || `top-${index}`}>
                       <td>
                         <div className='w-9 h-9 glass-elevated rounded-full flex items-center justify-center font-semibold'>
                           {index + 1}
@@ -483,13 +583,13 @@ const Dashboard = ({ token }) => {
                       </td>
                       <td>
                         <div className='flex items-center gap-3'>
-                          {product.image && (
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className='w-12 h-12 object-cover rounded border border-white/10'
-                            />
-                          )}
+                          <ProductImageThumbnails
+                            source={product.images}
+                            max={MAX_PRODUCT_IMAGES}
+                            sizeClass='w-10 h-10'
+                            fallbackSrc={assets.parcel_icon}
+                            alt={product.name}
+                          />
                           <div>
                             <p className='font-medium text-white'>{product.name}</p>
                             <p className='text-xs text-gray-300'>
