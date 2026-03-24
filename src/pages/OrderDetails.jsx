@@ -234,10 +234,11 @@ const OrderDetails = ({ token }) => {
     const summaryX = 120
     const lineStep = 6
 
-    let summaryLines = 3
-    if (parseFloat(priceBreakdown.apparelGST) > 0) summaryLines++
-    if (parseFloat(priceBreakdown.otherGST) > 0) summaryLines++
-    const summaryBoxH = summaryLines * lineStep + 20
+    const hasApparelGst = parseFloat(priceBreakdown.apparelGST) > 0
+    const hasOtherGst = parseFloat(priceBreakdown.otherGST) > 0
+    const showGstSplit = hasApparelGst && hasOtherGst
+    const gstLineCount = showGstSplit ? 3 : 1
+    const summaryBoxH = (2 + gstLineCount) * lineStep + 20
 
     doc.setDrawColor(200, 200, 200)
     doc.setLineWidth(0.5)
@@ -250,20 +251,29 @@ const OrderDetails = ({ token }) => {
     doc.text('Rs.' + priceBreakdown.subtotal, 188, sy, { align: 'right' })
     sy += lineStep
 
-    if (parseFloat(priceBreakdown.apparelGST) > 0) {
+    if (showGstSplit) {
       doc.text('GST Apparels (5%):', summaryX, sy)
       doc.text('Rs.' + priceBreakdown.apparelGST, 188, sy, { align: 'right' })
       sy += lineStep
-    }
-    if (parseFloat(priceBreakdown.otherGST) > 0) {
       doc.text('GST Other (18%):', summaryX, sy)
       doc.text('Rs.' + priceBreakdown.otherGST, 188, sy, { align: 'right' })
       sy += lineStep
+      doc.text('Total GST:', summaryX, sy)
+      doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
+      sy += lineStep
+    } else if (hasApparelGst) {
+      doc.text('GST Apparels (5%):', summaryX, sy)
+      doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
+      sy += lineStep
+    } else if (hasOtherGst) {
+      doc.text('GST Other (18%):', summaryX, sy)
+      doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
+      sy += lineStep
+    } else {
+      doc.text('GST:', summaryX, sy)
+      doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
+      sy += lineStep
     }
-
-    doc.text('Total GST:', summaryX, sy)
-    doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
-    sy += lineStep
 
     doc.text('Shipping:', summaryX, sy)
     doc.text('Rs.' + priceBreakdown.shippingFee, 188, sy, { align: 'right' })
@@ -328,6 +338,9 @@ const OrderDetails = ({ token }) => {
   }
 
   const priceBreakdown = calculatePriceBreakdown()
+  const hasApparelGst = priceBreakdown && parseFloat(priceBreakdown.apparelGST) > 0
+  const hasOtherGst = priceBreakdown && parseFloat(priceBreakdown.otherGST) > 0
+  const showGstSplit = hasApparelGst && hasOtherGst
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -467,22 +480,31 @@ const OrderDetails = ({ token }) => {
             <span>Subtotal (Products):</span>
             <span className="font-medium">{currency}{priceBreakdown.subtotal}</span>
           </div>
-          {parseFloat(priceBreakdown.apparelGST) > 0 && (
-            <div className="flex justify-between text-sm pl-3">
-              <span className="text-gray-400">GST on Apparels (5%)</span>
-              <span className="font-medium">{currency}{priceBreakdown.apparelGST}</span>
+          {showGstSplit ? (
+            <>
+              <div className="flex justify-between text-sm pl-3">
+                <span className="text-gray-400">GST on Apparels (5%)</span>
+                <span className="font-medium">{currency}{priceBreakdown.apparelGST}</span>
+              </div>
+              <div className="flex justify-between text-sm pl-3">
+                <span className="text-gray-400">GST on Other Items (18%)</span>
+                <span className="font-medium">{currency}{priceBreakdown.otherGST}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Total GST:</span>
+                <span className="font-medium">{currency}{priceBreakdown.totalGST}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between text-sm">
+              <span>
+                {hasApparelGst && 'GST on Apparels (5%)'}
+                {hasOtherGst && 'GST on Other Items (18%)'}
+                {!hasApparelGst && !hasOtherGst && 'GST'}
+              </span>
+              <span className="font-medium">{currency}{priceBreakdown.totalGST}</span>
             </div>
           )}
-          {parseFloat(priceBreakdown.otherGST) > 0 && (
-            <div className="flex justify-between text-sm pl-3">
-              <span className="text-gray-400">GST on Other Items (18%)</span>
-              <span className="font-medium">{currency}{priceBreakdown.otherGST}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-sm">
-            <span>Total GST:</span>
-            <span className="font-medium">{currency}{priceBreakdown.totalGST}</span>
-          </div>
           <div className="flex justify-between text-sm">
             <span>Shipping Fee:</span>
             <span className="font-medium">{currency}{priceBreakdown.shippingFee}</span>
