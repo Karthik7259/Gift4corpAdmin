@@ -7,6 +7,7 @@ import { assets } from '../assets/assets'
 import ProductImageThumbnails from '../components/ProductImageThumbnails'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { getGSTRate, isApparelCategory } from '../utils/gst'
 
 const OrderDetails = ({ token }) => {
   const { orderId } = useParams()
@@ -46,22 +47,33 @@ const OrderDetails = ({ token }) => {
     if (!order) return null
 
     let subtotal = 0
-    let totalGST = 0
+    let apparelGST = 0
+    let otherGST = 0
 
     order.items.forEach(item => {
       const itemPrice = item.price * item.quantity
       subtotal += itemPrice
 
-      const gstRate = item.category === 'Apparels' ? 0.05 : 0.18
+      const gstRate = getGSTRate(item.category)
       const gstAmount = itemPrice * gstRate
-      totalGST += gstAmount
+      if (isApparelCategory(item.category)) {
+        apparelGST += gstAmount
+      } else {
+        otherGST += gstAmount
+      }
     })
+
+    apparelGST = Math.round(apparelGST * 100) / 100
+    otherGST = Math.round(otherGST * 100) / 100
+    const totalGST = Math.round((apparelGST + otherGST) * 100) / 100
 
     const shippingFee = order.shippingFee || 100
     const total = subtotal + totalGST + shippingFee
 
     return {
       subtotal: subtotal.toFixed(2),
+      apparelGST: apparelGST.toFixed(2),
+      otherGST: otherGST.toFixed(2),
       totalGST: totalGST.toFixed(2),
       shippingFee: shippingFee.toFixed(2),
       total: total.toFixed(2)
@@ -169,14 +181,14 @@ const OrderDetails = ({ token }) => {
     
     order.items.forEach((item, index) => {
       const itemTotal = item.price * item.quantity
-      const gstRate = item.category === 'Apparels' ? 0.05 : 0.18
+      const gstRate = getGSTRate(item.category)
       const gstAmount = itemTotal * gstRate
       const itemWithGST = itemTotal + gstAmount
       
       tableData.push([
         index + 1,
         item.name,
-        item.category,
+        item.category || '—',
         item.size && item.size !== 'default' ? item.size : '-',
         'Rs.' + item.price.toFixed(2),
         item.quantity,
@@ -220,35 +232,56 @@ const OrderDetails = ({ token }) => {
 
     const finalY = doc.lastAutoTable.finalY + 10
     const summaryX = 120
-    
+    const lineStep = 6
+
+    let summaryLines = 3
+    if (parseFloat(priceBreakdown.apparelGST) > 0) summaryLines++
+    if (parseFloat(priceBreakdown.otherGST) > 0) summaryLines++
+    const summaryBoxH = summaryLines * lineStep + 20
+
     doc.setDrawColor(200, 200, 200)
     doc.setLineWidth(0.5)
-    doc.rect(summaryX - 5, finalY - 5, 75, 35)
-    
+    doc.rect(summaryX - 5, finalY - 5, 75, summaryBoxH)
+
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text('Subtotal:', summaryX, finalY)
-    doc.text('Rs.' + priceBreakdown.subtotal, 188, finalY, { align: 'right' })
-    
-    doc.text('Total GST:', summaryX, finalY + 6)
-    doc.text('Rs.' + priceBreakdown.totalGST, 188, finalY + 6, { align: 'right' })
-    
-    doc.text('Shipping:', summaryX, finalY + 12)
-    doc.text('Rs.' + priceBreakdown.shippingFee, 188, finalY + 12, { align: 'right' })
-    
+    let sy = finalY
+    doc.text('Subtotal:', summaryX, sy)
+    doc.text('Rs.' + priceBreakdown.subtotal, 188, sy, { align: 'right' })
+    sy += lineStep
+
+    if (parseFloat(priceBreakdown.apparelGST) > 0) {
+      doc.text('GST Apparels (5%):', summaryX, sy)
+      doc.text('Rs.' + priceBreakdown.apparelGST, 188, sy, { align: 'right' })
+      sy += lineStep
+    }
+    if (parseFloat(priceBreakdown.otherGST) > 0) {
+      doc.text('GST Other (18%):', summaryX, sy)
+      doc.text('Rs.' + priceBreakdown.otherGST, 188, sy, { align: 'right' })
+      sy += lineStep
+    }
+
+    doc.text('Total GST:', summaryX, sy)
+    doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
+    sy += lineStep
+
+    doc.text('Shipping:', summaryX, sy)
+    doc.text('Rs.' + priceBreakdown.shippingFee, 188, sy, { align: 'right' })
+    sy += lineStep
+
     doc.setFillColor(41, 128, 185)
-    doc.rect(summaryX - 5, finalY + 16, 75, 8, 'F')
+    doc.rect(summaryX - 5, sy, 75, 8, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
-    doc.text('TOTAL:', summaryX, finalY + 22)
-    doc.text('Rs.' + priceBreakdown.total, 188, finalY + 22, { align: 'right' })
-    
+    doc.text('TOTAL:', summaryX, sy + 6)
+    doc.text('Rs.' + priceBreakdown.total, 188, sy + 6, { align: 'right' })
+
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'italic')
-    const footerY = finalY + 35
-    doc.text('* GST: 5% for Apparels, 18% for other categories', 15, footerY)
+    const footerY = sy + 20
+    doc.text('* GST: 5% for apparel categories, 18% for all other categories', 15, footerY)
     doc.text('Thank you for your business!', 105, footerY + 5, { align: 'center' })
     
     doc.setFontSize(9)
@@ -378,9 +411,10 @@ const OrderDetails = ({ token }) => {
         <div className="space-y-4">
           {order.items.map((item, index) => {
             const itemTotal = item.price * item.quantity
-            const gstRate = item.category === 'Apparels' ? 0.05 : 0.18
+            const gstRate = getGSTRate(item.category)
             const gstAmount = itemTotal * gstRate
             const itemWithGST = itemTotal + gstAmount
+            const gstLabel = isApparelCategory(item.category) ? '5%' : '18%'
 
             return (
               <div
@@ -399,7 +433,7 @@ const OrderDetails = ({ token }) => {
                 <div className="flex-1">
                   <h4 className="font-semibold text-white">{item.name}</h4>
                   <p className="text-sm text-gray-300 mt-1">
-                    Category: {item.category} {item.subCategory && `| ${item.subCategory}`}
+                    Category: {item.category || '—'} {item.subCategory && `| ${item.subCategory}`}
                   </p>
                   {item.size && item.size !== 'default' && (
                     <p className="text-sm text-gray-300">Size: {item.size}</p>
@@ -409,7 +443,7 @@ const OrderDetails = ({ token }) => {
                       Price: {currency}{item.price} × {item.quantity} = {currency}{itemTotal.toFixed(2)}
                     </p>
                     <p>
-                      GST ({gstRate === 0.05 ? '5%' : '18%'}): {currency}{gstAmount.toFixed(2)}
+                      GST ({gstLabel}): {currency}{gstAmount.toFixed(2)}
                     </p>
                     <p className="font-semibold text-white mt-1">
                       Subtotal: {currency}{itemWithGST.toFixed(2)}
@@ -433,6 +467,18 @@ const OrderDetails = ({ token }) => {
             <span>Subtotal (Products):</span>
             <span className="font-medium">{currency}{priceBreakdown.subtotal}</span>
           </div>
+          {parseFloat(priceBreakdown.apparelGST) > 0 && (
+            <div className="flex justify-between text-sm pl-3">
+              <span className="text-gray-400">GST on Apparels (5%)</span>
+              <span className="font-medium">{currency}{priceBreakdown.apparelGST}</span>
+            </div>
+          )}
+          {parseFloat(priceBreakdown.otherGST) > 0 && (
+            <div className="flex justify-between text-sm pl-3">
+              <span className="text-gray-400">GST on Other Items (18%)</span>
+              <span className="font-medium">{currency}{priceBreakdown.otherGST}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm">
             <span>Total GST:</span>
             <span className="font-medium">{currency}{priceBreakdown.totalGST}</span>
@@ -449,7 +495,7 @@ const OrderDetails = ({ token }) => {
             </span>
           </div>
           <div className="text-xs text-gray-400 mt-2">
-            <p>* GST: 5% for Apparels, 18% for other categories</p>
+            <p>* GST: 5% for apparel categories, 18% for all other categories</p>
           </div>
         </div>
       </div>
