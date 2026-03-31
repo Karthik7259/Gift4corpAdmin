@@ -8,12 +8,22 @@ import ProductImageThumbnails from '../components/ProductImageThumbnails'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { getGSTRate, isApparelCategory } from '../utils/gst'
+import ConfirmDialog from '../components/ConfirmDialog'
+
+function shouldRestoreStockHint(order) {
+  if (!order) return false
+  if (order.paymentMethod === 'COD') return true
+  if (order.paymentMethod === 'Razorpay' && order.payment) return true
+  return false
+}
 
 const OrderDetails = ({ token }) => {
   const { orderId } = useParams()
   const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchOrderDetails = async () => {
     if (!token) return
@@ -95,6 +105,53 @@ const OrderDetails = ({ token }) => {
       }
     } catch (err) {
       toast.error(err.message)
+    }
+  }
+
+  const setPaymentStatus = async (payment) => {
+    if (!order) return
+    try {
+      const res = await axios.put(
+        `${backendURL}/api/order/payment-status`,
+        { orderId: order._id, payment },
+        { headers: { token } }
+      )
+      if (res.data.success) {
+        toast.success(res.data.message || (payment ? 'Marked as paid' : 'Marked as pending'))
+        await fetchOrderDetails()
+      } else {
+        toast.error(res.data.message || 'Failed')
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message)
+    }
+  }
+
+  const openDeleteModal = () => {
+    if (!order) return
+    setDeleteOpen(true)
+  }
+
+  const confirmDeleteOrder = async () => {
+    if (!order) return
+    setDeleting(true)
+    try {
+      const res = await axios.post(
+        `${backendURL}/api/order/delete`,
+        { orderId: order._id },
+        { headers: { token } }
+      )
+      if (res.data.success) {
+        toast.success(res.data.message || 'Order removed')
+        navigate('/orders')
+      } else {
+        toast.error(res.data.message || 'Failed')
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete')
+    } finally {
+      setDeleting(false)
+      setDeleteOpen(false)
     }
   }
 
@@ -262,11 +319,11 @@ const OrderDetails = ({ token }) => {
       doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
       sy += lineStep
     } else if (hasApparelGst) {
-      doc.text('GST Apparels (5%):', summaryX, sy)
+      doc.text('GST (5%):', summaryX, sy)
       doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
       sy += lineStep
     } else if (hasOtherGst) {
-      doc.text('GST Other (18%):', summaryX, sy)
+      doc.text('GST (18%):', summaryX, sy)
       doc.text('Rs.' + priceBreakdown.totalGST, 188, sy, { align: 'right' })
       sy += lineStep
     } else {
@@ -344,14 +401,64 @@ const OrderDetails = ({ token }) => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
+      <ConfirmDialog
+        open={deleteOpen && Boolean(order)}
+        onClose={() => !deleting && setDeleteOpen(false)}
+        title="Delete this order?"
+        subtitle={
+          order
+            ? `Order #${order._id.slice(-8).toUpperCase()} · ${currency}${order.amount}`
+            : ''
+        }
+        confirmLabel="Delete order"
+        cancelLabel="Cancel"
+        loading={deleting}
+        onConfirm={confirmDeleteOrder}
+        variant="danger"
+      >
+        {order && (
+          <>
+            {shouldRestoreStockHint(order) && (
+              <p className="text-amber-200/95 mb-3 flex gap-2">
+                <span className="shrink-0" aria-hidden>
+                  ↻
+                </span>
+                <span>Product stock will be restored for this order.</span>
+              </p>
+            )}
+            <p className="text-gray-400 text-xs leading-relaxed">
+              This removes the order from your admin and database only. Process refunds in Razorpay and
+              shipment changes in Shiprocket separately if needed.
+            </p>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <button
           onClick={() => navigate('/orders')}
           className="table-action"
         >
           ← Back to Orders
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {!order.payment && (
+            <button type="button" onClick={() => setPaymentStatus(true)} className="btn btn-secondary text-sm">
+              Mark paid
+            </button>
+          )}
+          {order.payment && (
+            <button
+              type="button"
+              onClick={() => setPaymentStatus(false)}
+              className="btn text-sm border border-amber-500/50 text-amber-200 hover:bg-amber-500/10"
+            >
+              Mark pending
+            </button>
+          )}
+          <button type="button" onClick={openDeleteModal} className="btn text-sm border border-red-500/50 text-red-300 hover:bg-red-500/10">
+            Delete order
+          </button>
           <button
             onClick={downloadInvoice}
             className="btn btn-primary"
@@ -362,7 +469,31 @@ const OrderDetails = ({ token }) => {
         </div>
       </div>
 
-      <div className="section-card glass-card">
+      <div
+        className={`section-card glass-card relative overflow-hidden ${
+          !order.payment
+            ? 'border-2 border-red-500 bg-red-950/40 ring-2 ring-red-500/50 shadow-[0_0_24px_-4px_rgba(239,68,68,0.35)]'
+            : ''
+        }`}
+      >
+        {!order.payment && (
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500 rounded-l pointer-events-none"
+            aria-hidden
+          />
+        )}
+        {!order.payment && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-red-500/35 pb-3">
+            <span className="inline-flex items-center rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-md">
+              Payment pending
+            </span>
+            <span className="text-xs text-red-200/90">
+              {order.paymentMethod === 'Razorpay'
+                ? 'Awaiting online payment'
+                : 'Cash on delivery — not marked paid yet'}
+            </span>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-lg font-semibold mb-3 text-white">Order Information</h3>
@@ -372,7 +503,7 @@ const OrderDetails = ({ token }) => {
               <p><span className="font-medium">Payment Method:</span> {order.paymentMethod}</p>
               <p>
                 <span className="font-medium">Payment Status:</span>{' '}
-                <span className={order.payment ? 'text-green-300' : 'text-yellow-300'}>
+                <span className={order.payment ? 'text-green-300' : 'text-red-300 font-semibold'}>
                   {order.payment ? 'Paid' : 'Pending'}
                 </span>
               </p>
@@ -498,8 +629,8 @@ const OrderDetails = ({ token }) => {
           ) : (
             <div className="flex justify-between text-sm">
               <span>
-                {hasApparelGst && 'GST on Apparels (5%)'}
-                {hasOtherGst && 'GST on Other Items (18%)'}
+                {hasApparelGst && 'GST (5%)'}
+                {hasOtherGst && 'GST (18%)'}
                 {!hasApparelGst && !hasOtherGst && 'GST'}
               </span>
               <span className="font-medium">{currency}{priceBreakdown.totalGST}</span>
